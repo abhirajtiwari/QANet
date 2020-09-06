@@ -8,7 +8,7 @@ python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
 <br>
 Sample input:
 ```bash
-python3 evaluate-v2.0.py dev-v2.0.json dev-evaluate-v2.0-in1.txt
+python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
 ```
 
 <br>
@@ -25,5 +25,4 @@ Sample output:
   "NoAns_f1": 70.4457527333894,
   "NoAns_total": 5945
 }
-
 ```

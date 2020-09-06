@@ -5,7 +5,7 @@ To run the evaluation:
 ```bash
 python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
 ```
-<br>
+
 Sample input:
 ```bash
 python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>

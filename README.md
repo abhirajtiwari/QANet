@@ -8,10 +8,9 @@ python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
 
 Sample input:
 ```bash
-python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
+python3 evaluate-v2.0.py dev-v2.0.json dev-evaluate-v2.0-in1.txt
 ```
 
-<br>
 Sample output:
 ```
 {

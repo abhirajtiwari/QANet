@@ -7,7 +7,7 @@ import torch.nn.Functional as F
 
 class InputEmbeddingLayer(nn.Module):
     """Input Embedding layer used by QANet
-    Word embedding of 300 D
+    Word embeddings of 300 D
 
     Args:
         word_vectors (torch.Tensor): GLoVE vectors (300-D)
@@ -17,7 +17,7 @@ class InputEmbeddingLayer(nn.Module):
         self.embedding = nn.Embedding.from_pretrained(word_vectors)
 
     def forward(self, x):
-        emb = self.embedding(x) # (batch_size, sequence_length, p1)
+        emb = self.embedding(x) # (batch_size, sequence_length, p1=300)
 
         return emb
 

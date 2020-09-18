@@ -31,6 +31,7 @@ class EmbeddingEncodeLayer(nn.Module):
 
         return out
 
+
 class CQAttentionLayer(nn.Module):
     """[summary]
 
@@ -43,6 +44,7 @@ class CQAttentionLayer(nn.Module):
     def forward(self, context, question):
 
         return out
+
 
 class ModelEncoderLayer(nn.Module):
     """[summary]
@@ -57,6 +59,7 @@ class ModelEncoderLayer(nn.Module):
 
         return out
 
+
 class OutputLayer(nn.Module):
     """Takes inputs from 2 of the ModelEncoderLayers
 
@@ -70,6 +73,7 @@ class OutputLayer(nn.Module):
 
         return out
 
+
 # ---------------- Helper Layers ----------------------        
 
 class SelfAttention(nn.Module):
@@ -80,9 +84,11 @@ class SelfAttention(nn.Module):
     """
     def __init__(self, ):
         super(SelfAttention, self).__init__()
+        
     def forward(self, x):
 
         return out
+
 
 class EncoderBlock(nn.Module):
     """[summary]

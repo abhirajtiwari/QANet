@@ -1,13 +1,16 @@
+import torch
 from torch import nn
+import torch.nn.Functional as F
 
 
 # --------------- Model Layers ------------------
 
 class InputEmbeddingLayer(nn.Module):
     """Input Embedding layer used by QANet
+    Word embedding of 300 D
 
     Args:
-        word_vectors (torch.Tensor): GLoVE vectors
+        word_vectors (torch.Tensor): GLoVE vectors (300-D)
     """
     def __init__(self, word_vectors):
         super(InputEmbeddingLayer, self).__init__()

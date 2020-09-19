@@ -20,7 +20,7 @@ class QANET(nn.module()):
             enc_blocks=1,
             drop_prob=drop_prob,
             sent_len=sent_len, 
-            word_embed_size=word_embed_size
+            word_embed=word_embed_size
         )
         self.qc_att = layers.CQAttentionLayer(
             drop_prob=drop_prob
@@ -33,7 +33,7 @@ class QANET(nn.module()):
             enc_blocks=7,
             drop_prob=drop_prob, 
             sent_len=sent_len,
-            word_embed_size=word_embed_size
+            word_embed=word_embed_size
         )
         self.out = layers.OutputLayer(
             drop_prob=drop_prob

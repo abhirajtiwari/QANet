@@ -178,19 +178,21 @@ class SelfAttentionBlock(nn.Module):
         return x + att
 
 class FeedForwardBlock(nn.Module):
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features, out_features, sent_len):
         super(FeedForwardBlock, self).__init__()
         self.ff = nn.Sequential(
             nn.Linear(in_features, out_features, bias=False),
             nn.ReLU()
         )
-        self.layer_norm = nn.LayerNorm(in_features) # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm([in_features, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
-        return x + self.ff(self.layer_norm(x))
+        ln = self.layer_norm(x)
+        return x + self.ff(ln.permute(0, 2, 1)).permute(0, 2, 1)
 
 
 if __name__ == "__main__":
     a = torch.randn((2, 128, 32))
     conv_block = ConvolutionBlock(128, 32, 7)
     attn_block = SelfAttentionBlock(128, 32)
-    print(conv_block(a).size(), attn_block(a).size())
+    ff_block = FeedForwardBlock(128, 128, 32)
+    print(conv_block(a).size(), attn_block(a).size(), ff_block(a).size())

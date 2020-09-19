@@ -24,27 +24,7 @@ class InputEmbeddingLayer(nn.Module):
 
         return emb  # (batch_size, sent_len, word_embed_size)
 
-class EmbeddingEncoderLayer(nn.Module):
-    """
-    output shape: (batch_size, seq_len, enc_size=128)
-    """
 
-    def __init__(self, conv_layers, kernel_size, filters, heads, enc_blocks, drop_prob, sent_len, word_embed_size):
-        super(EmbeddingEncoderLayer, self).__init__()
-        self.emb_enc = nn.ModuleList([
-            EncoderBlock(
-                conv_layers=conv_layers,
-                kernel_size=kernel_size,
-                filters=filters,
-                heads=heads,
-                drop_prob=drop_prob,
-                sent_len=sent_len,
-                word_embed_size=word_embed_size)
-            for _ in range(enc_blocks-1)])
-
-    def forward(self, x):
-        out = self.emb_enc(x)
-        return out
 
 
 # class CQAttentionLayer(nn.Module):
@@ -106,29 +86,46 @@ class EmbeddingEncoderLayer(nn.Module):
 #         # return out
 
 
-class EncoderBlock(nn.Module):
+class EmbeddingEncoderBlock(nn.Module):
     """
     """
 
-    # def __init__(self, conv_layers, kernel_size, filters, heads, drop_prob, sent_len, embed_size):
-    #     super(EncoderBlock, self).__init__()
-    #     self.positional_embedding = nn.Embedding(sent_len, embed_size)
-    #     self.conv = nn.ModuleList([
-    #         ConvBlock(in_channels=_, out_channels=_, kernel_size=kernel_size)
-    #                                for _ in range(conv_layers)])
-    #     self.att = SelfAttention(heads=heads, drop_prob=drop_prob)
-    #     self.ff = nn.Linear()
-    #     self.layer_norm = nn.LayerNorm()
+    def __init__(self, conv_layers, kernel_size, filters, heads, drop_prob, sent_len, word_embed):
+        super(EmbeddingEncoderBlock, self).__init__()
+        self.pos_enc = nn.Embedding(sent_len, word_embed)
 
-    # def forward(self, x):
-    #     N, sent_len, word_embed_size = x.shape
-    #     positions = torch.arange(0, sent_len).expand(N, sent_len)
-    #     x = x + self.positional_embedding(positions)
+        self.layer_norm = nn.LayerNorm([word_embed, sent_len])
+        self.conv_0 = nn.Conv1d(
+            word_embed, 128, kernel_size, padding=kernel_size//2)
+        self.conv = nn.ModuleList([
+            ConvBlock(word_embed=128, sent_len=sent_len,
+                      in_channels=128, kernel_size=kernel_size)
+            for _ in range(conv_layers - 1)
+        ])
 
-    #     for layer in self.conv:
-    #         x = layer()
+        # self.att = SelfAttention()
+        # self.ff = nn.Linear()
+        
 
-        # return out
+    def forward(self, x):
+        N, word_embed, sent_len = x.shape
+        positions = torch.arange(0, sent_len).expand(N, sent_len)
+
+        # Add positional Encoding:
+        x = x.view(N, sent_len, word_embed) + self.pos_enc(positions)
+        x = x.view(N, word_embed, sent_len)
+
+        # Layer norm -> conv_0 (No residual block as 300!=128)
+        x = self.layer_norm(x)
+        x = self.conv_0(x)
+
+        # Repetition of layer_norm and conv with residual block
+        for layer in self.conv:
+            x = layer(x)
+
+        # Layer_norm -> Self Attention
+        # Layer_norm -> Feed Forward
+        return x
 class ConvBlock(nn.Module):
     """
     """
@@ -146,40 +143,33 @@ class ConvBlock(nn.Module):
         return out
 
 
+class EmbeddingEncoderLayer(nn.Module):
+    """
+    """
+
+    def __init__(self, conv_layers, kernel_size, filters, heads, enc_blocks, drop_prob, sent_len, word_embed):
+        
+        super(EmbeddingEncoderLayer, self).__init__()
+        self.emb_enc = nn.ModuleList([
+            EmbeddingEncoderBlock(conv_layers, kernel_size,
+                                  filters, heads, drop_prob, sent_len, word_embed)
+            for _ in range(enc_blocks)
+        ])
+
+    def forward(self, x):
+        for layer in self.emb_enc:
+            x = layer(x)
+        return x
+
 
 if __name__ == "__main__":
     torch.manual_seed(0)
 
     x = torch.randn((32, 300, 100)) # (batch_size, word_embed, sent_len)
-    N, word_embed, sent_len = x.shape
-    positions = torch.arange(0, sent_len).expand(N, sent_len)
     
-    ### init
-    
-    pos_enc = nn.Embedding(sent_len, word_embed)
-    layer_norm = nn.LayerNorm(x.shape[1:])
-    conv_0 = nn.Conv1d(word_embed, 128, 7, padding=7//2)
+    x_l = EmbeddingEncoderLayer(conv_layers=4, kernel_size=7, filters=128,
+                                heads=8, enc_blocks=1, drop_prob=0, sent_len=100, word_embed=300)(x)
+    x_b = EmbeddingEncoderBlock(conv_layers=4, kernel_size=7, filters=128,
+                                heads=8, drop_prob=0, sent_len=100, word_embed=300)(x)
 
-    conv = nn.ModuleList([
-        ConvBlock(128, sent_len, 128, 7),
-        ConvBlock(128, sent_len, 128, 7),
-        ConvBlock(128, sent_len, 128, 7)
-    ])
-
-
-
-    
-    ### forward:
-
-    # Conv_0: Embedding encoder layer: (only 1 block) i/p = 300, o/p = 128
-    x = x.view(N, sent_len, word_embed) + pos_enc(positions) # adding positional embedding
-    x = x.view(N, word_embed, sent_len) 
-    x_l = layer_norm(x)
-    x_l = conv_0(x_l)
-
-    # Conv_1-3:
-    for l in conv:
-        x_r = l(x_l)
-
-    
-    print(x.shape, x_l.shape)
+    print(x.shape, x_l.shape, x_b.shape)

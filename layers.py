@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import torch.nn.Functional as F
+import torch.nn.functional as F
 
 
 # --------------- Model Layers ------------------
@@ -79,7 +79,7 @@ class OutputLayer(nn.Module):
 
 # ---------------- Helper Layers ----------------------        
 
-class SelfAttention(nn.Module):
+class SelfAttention(nn.Module): # FIXME This class is wrong
     """Multi-head self attention
     Refer to Attention is all you need paper to understand terminology
 
@@ -99,7 +99,7 @@ class SelfAttention(nn.Module):
 
         self.linear = nn.Linear(in_features=self.d_model, out_features=self.d_model, bias=False)
 
-    def forward(self, values, keys, query, mask):
+    def forward(self, values, keys, query, mask=None):
         N = query.shape[0]  # Batch Size
         value_len, key_len, query_len = values.shape[1], keys.shape[1], query.shape[1]
 
@@ -143,7 +143,7 @@ class EncoderBlock(nn.Module):
         # TODO positional encoding sometime
 
         self.conv = nn.ModuleList(
-            [ConvolutionBlock(c_in=d_model,c_out=filters, kernel_size) for _ in range(conv_layer)] # FIXME is c_in right??
+            [ConvolutionBlock(c_in=d_model,c_out=filters, kernel_size=kernel_size) for _ in range(conv_layer)] # FIXME is c_in right??
         )
         self.attn = SelfAttentionBlock(d_model)
         self.ff = FeedForwardBlock(filters, filters)
@@ -157,18 +157,18 @@ class EncoderBlock(nn.Module):
 # -------------------- Residual Blocks ----------------------
 
 class ConvolutionBlock(nn.Module):
-    def __init__(self, c_in, c_out, kernel_size):
+    def __init__(self, c_in, sent_len, kernel_size):
         super(ConvolutionBlock, self).__init__()
-        self.conv = nn.Conv2d(c_in, c_out, kernel_size, bias=False)
-        self.layer_norm = nn.LayerNorm(c_in) # FIXME add the layer norm parameters, what is normalised_shape
+        self.conv = nn.Conv1d(c_in, c_in, kernel_size, bias=False, padding=(kernel_size//2))
+        self.layer_norm = nn.LayerNorm([c_in, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
         return x + self.conv(self.layer_norm(x))
 
 class SelfAttentionBlock(nn.Module):
-    def __init__(self, d_model):
+    def __init__(self, d_model, sent_len):
         super(SelfAttentionBlock, self).__init__()
         self.self_attn = SelfAttention(d_model)
-        self.layer_norm = nn.LayerNorm(d_model) # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm([d_model, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
         a = self.layer_norm(x)
         return x + self.self_attn(a, a, a)
@@ -185,3 +185,8 @@ class FeedForwardBlock(nn.Module):
         return x + self.ff(self.layer_norm(x))
 
 
+if __name__ == "__main__":
+    a = torch.randn((2, 300, 32))
+    conv_block = ConvolutionBlock(300, 32, 7)
+    attn_block = SelfAttentionBlock(300, 32)
+    print(conv_block(a).size(), attn_block(a).size())

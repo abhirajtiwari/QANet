@@ -7,11 +7,9 @@ import torch.nn.functional as F
 
 class InputEmbeddingLayer(nn.Module):
     """
-    Class that converts input words to their 300-d GLoVE word embeddings.
     """
     def __init__(self, word_vectors, drop_prob):
         """
-        output shape: (batch_size, sent_len, word_embed_size=300)
         """
         super(InputEmbeddingLayer, self).__init__()
         self.drop_prob = drop_prob 
@@ -19,71 +17,10 @@ class InputEmbeddingLayer(nn.Module):
         
 
     def forward(self, x):
-        emb = self.embed(x)   # (batch_size, sent_len, word_embed_size)
+        emb = self.embed(x)   
         emb = F.dropout(emb, self.drop_prob, self.training)
 
-        return emb  # (batch_size, sent_len, word_embed_size)
-
-
-
-
-# class CQAttentionLayer(nn.Module):
-#     """
-#     """
-#     def __init__(self, drop_prob):
-#         super(CQAttentionLayer, self).__init__()
-
-#     def forward(self, context, question):
-#         pass
-#         # return out
-
-
-# class ModelEncoderLayer(nn.Module):
-#     """
-#     """
-
-#     def __init__(self, conv_layers, kernel_size, filters, heads, enc_blocks, drop_prob, sent_len, word_embed_size):
-#         super(ModelEncoderLayer, self).__init__()
-#         self.positional_embedding = nn.Embedding(sent_len, word_embed_size)
-#         self.model_enc = nn.ModuleList([
-#             EncoderBlock(
-#                 conv_layers=conv_layers,
-#                 kernel_size=kernel_size,
-#                 filters=filters,
-#                 heads=heads,
-#                 drop_prob=drop_prob,
-#                 sent_len=sent_len,
-#                 word_embed_size=word_embed_size)
-#             for _ in range(enc_blocks-1)])
-
-#     def forward(self, x):
-#         x = self.positional_embedding(x)
-#         out = self.model_enc(x)
-#         return out
-
-
-# class OutputLayer(nn.Module):
-#     """
-#     """
-#     def __init__(self, drop_prob):
-#         super(OutputLayer, self).__init__()
-
-#     def forward(self, a, b):
-#         pass
-        # return out
-
-
-# ---------------- Helper Layers ----------------------        
-
-# class SelfAttention(nn.Module):
-#     """
-#     """
-#     def __init__(self, heads, drop_prob):
-#         super(SelfAttention, self).__init__()
-        
-#     def forward(self, x):
-#         pass
-#         # return out
+        return emb  
 
 
 class EmbeddingEncoderBlock(nn.Module):
@@ -104,16 +41,17 @@ class EmbeddingEncoderBlock(nn.Module):
         ])
 
         # self.att = SelfAttention()
-        # self.ff = nn.Linear()
-        
+
+        self.ff = FeedForwardBlock(
+            word_embed=128, sent_len=sent_len, in_features=128, out_features=128)
 
     def forward(self, x):
         N, word_embed, sent_len = x.shape
         positions = torch.arange(0, sent_len).expand(N, sent_len)
 
         # Add positional Encoding:
-        x = x.view(N, sent_len, word_embed) + self.pos_enc(positions)
-        x = x.view(N, word_embed, sent_len)
+        x = x.permute(0, 2, 1) + self.pos_enc(positions)
+        x = x.permute(0, 2, 1)
 
         # Layer norm -> conv_0 (No residual block as 300!=128)
         x = self.layer_norm(x)
@@ -125,24 +63,52 @@ class EmbeddingEncoderBlock(nn.Module):
 
         # Layer_norm -> Self Attention
         # Layer_norm -> Feed Forward
+        x = self.ff(x)
         return x
-class ConvBlock(nn.Module):
+
+
+# class CQAttentionLayer(nn.Module):
+#     """
+#     """
+#     def __init__(self, drop_prob):
+#         super(CQAttentionLayer, self).__init__()
+
+#     def forward(self, context, question):
+#         pass
+#         # return out
+
+
+class ModelEncoderLayer(nn.Module):
     """
+    if enc_blocks > 1 -> positional encoding?
     """
 
-    def __init__(self, word_embed, sent_len, in_channels, kernel_size):
-        super(ConvBlock, self).__init__()
+    def __init__(self, conv_layers, kernel_size, filters, heads, enc_blocks, drop_prob, sent_len, word_embed):
+        super(ModelEncoderLayer, self).__init__()
+        self.model_enc = nn.ModuleList([
+            EmbeddingEncoderBlock(conv_layers, kernel_size,
+                                  filters, heads, drop_prob, sent_len, word_embed)
+            for _ in range(enc_blocks)
+        ])
 
-        self.layer_norm = nn.LayerNorm([word_embed, sent_len])
-        self.conv = nn.Conv1d(in_channels, in_channels, kernel_size, padding=kernel_size//2)
-    
     def forward(self, x):
-        x_l = self.layer_norm(x)
-        x_l = self.conv(x_l)
-        out = x + x_l 
-        return out
+        for layer in self.model_enc:
+            x = layer(x)
+        return x
 
 
+# class OutputLayer(nn.Module):
+#     """
+#     """
+#     def __init__(self, drop_prob):
+#         super(OutputLayer, self).__init__()
+
+#     def forward(self, a, b):
+#         pass
+        # return out
+
+
+# ---------------- Helper Layers ----------------------        
 class EmbeddingEncoderLayer(nn.Module):
     """
     """
@@ -162,14 +128,63 @@ class EmbeddingEncoderLayer(nn.Module):
         return x
 
 
+class ConvBlock(nn.Module):
+    """
+    """
+
+    def __init__(self, word_embed, sent_len, in_channels, kernel_size):
+        super(ConvBlock, self).__init__()
+
+        self.layer_norm = nn.LayerNorm([word_embed, sent_len])
+        self.conv = nn.Conv1d(in_channels, in_channels,
+                              kernel_size, padding=kernel_size//2)
+
+    def forward(self, x):
+        x_l = self.layer_norm(x)
+        x_l = self.conv(x_l)
+        out = x + x_l
+        return out
+
+
+class FeedForwardBlock(nn.Module):
+    def __init__(self, word_embed, sent_len, in_features, out_features):
+        super(FeedForwardBlock, self).__init__()
+
+        self.layer_norm = nn.LayerNorm([word_embed, sent_len])
+        self.ff = nn.Sequential(
+            nn.Linear(in_features, out_features),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        x_l = self.layer_norm(x)
+        x_l = x + self.ff(x.permute(0, 2, 1)).permute(0, 2, 1)
+        return x
+
+
+# class SelfAttention(nn.Module):
+#     """
+#     """
+#     def __init__(self, heads, drop_prob):
+#         super(SelfAttention, self).__init__()
+
+#     def forward(self, x):
+#         pass
+#         # return out
+
+
 if __name__ == "__main__":
     torch.manual_seed(0)
 
     x = torch.randn((32, 300, 100)) # (batch_size, word_embed, sent_len)
     
-    x_l = EmbeddingEncoderLayer(conv_layers=4, kernel_size=7, filters=128,
-                                heads=8, enc_blocks=1, drop_prob=0, sent_len=100, word_embed=300)(x)
     x_b = EmbeddingEncoderBlock(conv_layers=4, kernel_size=7, filters=128,
                                 heads=8, drop_prob=0, sent_len=100, word_embed=300)(x)
-
-    print(x.shape, x_l.shape, x_b.shape)
+    x_e = EmbeddingEncoderLayer(conv_layers=4, kernel_size=7, filters=128,
+                                heads=8, enc_blocks=1, drop_prob=0, sent_len=100, word_embed=300)(x)
+    x_m = ModelEncoderLayer(conv_layers=2, kernel_size=5, filters=128,
+                                heads=8, enc_blocks=1, drop_prob=0, sent_len=100, word_embed=300)(x)
+    x_c = ConvBlock(128, 100, 128, 7)(x_e)
+    x_f = FeedForwardBlock(128, 100, 128, 128)(x_m)
+    
+    print(x.shape, x_b.shape, x_e.shape, x_m.shape, x_c.shape, x_f.shape, sep='\n')

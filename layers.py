@@ -28,9 +28,9 @@ class EmbeddingEncodeLayer(nn.Module):
     Args:
         d_model (int): Dimension of the word_vector
     """
-    def __init__(self, d_model):
+    def __init__(self, d_model, sent_len):
         super(EmbeddingEncoderLayer, self).__init__()
-        self.enc_layer = EncoderBlock(d_model)
+        self.enc_layer = EncoderBlock(d_model, sent_len)
     def forward(self, x):
         return self.enc_layer(x)
 
@@ -79,7 +79,7 @@ class OutputLayer(nn.Module):
 
 # ---------------- Helper Layers ----------------------        
 
-class SelfAttention(nn.Module): # FIXME This class is wrong
+class SelfAttention(nn.Module): 
     """Multi-head self attention
     Refer to Attention is all you need paper to understand terminology
 

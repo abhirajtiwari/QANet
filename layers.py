@@ -138,19 +138,21 @@ class EncoderBlock(nn.Module):
     Args:
         nn ([type]): [description]
     """
-    def __init__(self, d_model, conv_layer=4, kernel_size=7, filters=128, heads=8):
-        super(EmbeddingEncoderLayer, self).__init__()
+    def __init__(self, d_model, sent_len, conv_layer=4, kernel_size=7, filters=128, heads=8):
+        super(EncoderBlock, self).__init__()
 
         # TODO positional encoding sometime
-
+        self.conv1 = nn.Conv1d(d_model, filters, kernel_size, padding=(kernel_size//2))
         self.conv = nn.ModuleList(
-            [ConvolutionBlock(c_in=d_model,c_out=filters, kernel_size=kernel_size) for _ in range(conv_layer)] # FIXME is c_in right??
+            [ConvolutionBlock(c_in=filters,sent_len=sent_len, kernel_size=kernel_size) for _ in range(conv_layer-1)]
         )
-        self.attn = SelfAttentionBlock(d_model)
-        self.ff = FeedForwardBlock(filters, filters)
+        self.attn = SelfAttentionBlock(filters, sent_len)
+        self.ff = FeedForwardBlock(filters, filters, sent_len)
 
     def forward(self, x):
-        x = self.conv(x)
+        x = self.conv1(x)
+        for layer in self.conv:
+            x = layer(x)
         x = self.attn(x)
         x = self.ff(x)
         return x
@@ -184,15 +186,13 @@ class FeedForwardBlock(nn.Module):
             nn.Linear(in_features, out_features, bias=False),
             nn.ReLU()
         )
-        self.layer_norm = nn.LayerNorm([in_features, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm([in_features, sent_len]) 
     def forward(self, x):
         ln = self.layer_norm(x)
         return x + self.ff(ln.permute(0, 2, 1)).permute(0, 2, 1)
 
 
 if __name__ == "__main__":
-    a = torch.randn((2, 128, 32))
-    conv_block = ConvolutionBlock(128, 32, 7)
-    attn_block = SelfAttentionBlock(128, 32)
-    ff_block = FeedForwardBlock(128, 128, 32)
-    print(conv_block(a).size(), attn_block(a).size(), ff_block(a).size())
+    a = torch.randn((2, 300, 32))
+    enc_block = EncoderBlock(300, 32)
+    print(enc_block(a).size())

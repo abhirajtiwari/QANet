@@ -88,10 +88,11 @@ class SelfAttention(nn.Module): # FIXME This class is wrong
         h (int): number of heads
     """
     def __init__(self, d_model, h=8):
+        assert(d_model%h == 0)
         super(SelfAttention, self).__init__()
         self.d_model = d_model
         self.h = h
-        self.d_v = int(self.d_model/h)
+        self.d_v = self.d_model//h
 
         self.W_q = nn.Linear(in_features=self.d_v, out_features=self.d_v, bias=False)
         self.W_k = nn.Linear(in_features=self.d_v, out_features=self.d_v, bias=False)
@@ -101,7 +102,7 @@ class SelfAttention(nn.Module): # FIXME This class is wrong
 
     def forward(self, values, keys, query, mask=None):
         N = query.shape[0]  # Batch Size
-        value_len, key_len, query_len = values.shape[1], keys.shape[1], query.shape[1]
+        value_len, key_len, query_len = values.shape[2], keys.shape[2], query.shape[2]
 
         # Split embedding in self.head pieces:
         values = values.reshape(N, value_len, self.h, self.d_v)
@@ -160,7 +161,7 @@ class ConvolutionBlock(nn.Module):
     def __init__(self, c_in, sent_len, kernel_size):
         super(ConvolutionBlock, self).__init__()
         self.conv = nn.Conv1d(c_in, c_in, kernel_size, bias=False, padding=(kernel_size//2))
-        self.layer_norm = nn.LayerNorm([c_in, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm([c_in, sent_len]) 
     def forward(self, x):
         return x + self.conv(self.layer_norm(x))
 
@@ -168,10 +169,13 @@ class SelfAttentionBlock(nn.Module):
     def __init__(self, d_model, sent_len):
         super(SelfAttentionBlock, self).__init__()
         self.self_attn = SelfAttention(d_model)
-        self.layer_norm = nn.LayerNorm([d_model, sent_len]) # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm([d_model, sent_len]) 
     def forward(self, x):
         a = self.layer_norm(x)
-        return x + self.self_attn(a, a, a)
+        att = self.self_attn(a, a, a)
+        att = att.permute(0, 2, 1)
+
+        return x + att
 
 class FeedForwardBlock(nn.Module):
     def __init__(self, in_features, out_features):
@@ -186,7 +190,7 @@ class FeedForwardBlock(nn.Module):
 
 
 if __name__ == "__main__":
-    a = torch.randn((2, 300, 32))
-    conv_block = ConvolutionBlock(300, 32, 7)
-    attn_block = SelfAttentionBlock(300, 32)
+    a = torch.randn((2, 128, 32))
+    conv_block = ConvolutionBlock(128, 32, 7)
+    attn_block = SelfAttentionBlock(128, 32)
     print(conv_block(a).size(), attn_block(a).size())

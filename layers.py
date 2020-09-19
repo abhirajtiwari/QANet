@@ -11,14 +11,15 @@ class InputEmbeddingLayer(nn.Module):
 
     Args:
         word_vectors (torch.Tensor): GLoVE vectors (300-D)
+        drop_prob (float): Dropout
     """
-    def __init__(self, word_vectors):
+    def __init__(self, word_vectors, drop_prob=0.1):
         super(InputEmbeddingLayer, self).__init__()
         self.embedding = nn.Embedding.from_pretrained(word_vectors)
-
+        self.dropout = torch.nn.Dropout(drop_prob)
     def forward(self, x):
         emb = self.embedding(x) # (batch_size, sequence_length, p1)
-
+        emb = self.dropout(emb)
         return emb
 
 class EmbeddingEncodeLayer(nn.Module):
@@ -159,7 +160,7 @@ class ConvolutionBlock(nn.Module):
     def __init__(self, c_in, c_out, kernel_size):
         super(ConvolutionBlock, self).__init__()
         self.conv = nn.Conv2d(c_in, c_out, kernel_size, bias=False)
-        self.layer_norm = nn.LayerNorm() # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm(c_in) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
         return x + self.conv(self.layer_norm(x))
 
@@ -167,7 +168,7 @@ class SelfAttentionBlock(nn.Module):
     def __init__(self, d_model):
         super(SelfAttentionBlock, self).__init__()
         self.self_attn = SelfAttention(d_model)
-        self.layer_norm = nn.LayerNorm() # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm(d_model) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
         a = self.layer_norm(x)
         return x + self.self_attn(a, a, a)
@@ -179,7 +180,7 @@ class FeedForwardBlock(nn.Module):
             nn.Linear(in_features, out_features, bias=False),
             nn.ReLU()
         )
-        self.layer_norm = nn.LayerNorm() # FIXME add the layer norm parameters, what is normalised_shape
+        self.layer_norm = nn.LayerNorm(in_features) # FIXME add the layer norm parameters, what is normalised_shape
     def forward(self, x):
         return x + self.ff(self.layer_norm(x))
 

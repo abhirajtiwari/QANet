@@ -177,5 +177,6 @@ if __name__ == "__main__":
                                 heads=8, enc_blocks=1, drop_prob=0, sent_len=100, word_embed=300)(x)
     x_c = ConvBlock(128, 100, 128, 7)(x_e)
     x_f = FeedForwardBlock(128, 100, 128, 128)(x_m)
+    x_a = SelfAttentionBlock(word_embed=128, sent_len=100, heads=8, drop_prob=0)(x_m)
     
-    print(x.shape, x_b.shape, x_e.shape, x_m.shape, x_c.shape, x_f.shape, sep='\n')
+    print(x.shape, x_b.shape, x_e.shape, x_m.shape, x_c.shape, x_f.shape, x_a.shape, sep='\n')

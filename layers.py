@@ -1,11 +1,12 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import math
 
 
 # --------------- Model Layers ------------------
 
-class InputEmbeddingLayer(nn.Module):
+class InputEmbeddingBlock(nn.Module):
     """Input Embedding layer used by QANet
     Word embedding of 300 D
 
@@ -22,11 +23,12 @@ class InputEmbeddingLayer(nn.Module):
         emb = self.dropout(emb)
         return emb
 
-class EmbeddingEncodeLayer(nn.Module):
+class EmbeddingEncodeBlock(nn.Module):
     """Embedding Encoder Layer
 
     Args:
         d_model (int): Dimension of the word_vector
+        sent_len (int): Length of the sentence
     """
     def __init__(self, d_model, sent_len):
         super(EmbeddingEncoderLayer, self).__init__()
@@ -35,46 +37,80 @@ class EmbeddingEncodeLayer(nn.Module):
         return self.enc_layer(x)
 
 
-class CQAttentionLayer(nn.Module):
-    """[summary]
+class CQAttentionBlock(nn.Module):
+    """context query attention layer 
+    understood and influenced from https://github.com/tailerr/QANet-pytorch/
 
     Args:
-        nn ([type]): [description]
+        context (torch.Tensor): Encoded context vectors
+        queries (torch.Tensor): Encoded queries vectors
     """
-    def __init__(self, ):
+    def __init__(self, d_model):
         super(CQAttentionLayer, self).__init__()
+        self.d_model = d_model
 
-    def forward(self, context, question):
+        w = torch.empty(d_model*3)
+        lim = 1/d_model
+        nn.init.uniform_(w, -math.sqrt(lim), m.sqrt(lim))
+        self.w = nn.Parameter(w)
 
-        return out
+    def forward(self, context, query):
+        c_len = context.size(1)
+        q_len = query.size(1)
+        # nn.functional.dropout(context, self.dropout, self.training, True)
+        # nn.functional.dropout(query, self.dropout, self.training, True)
+        c = context.repeat(q_len, 1, 1, 1).permute([1, 0, 2, 3])
+        q = query.repeat(c_len, 1, 1, 1).permute([1, 2, 0, 3])
+        cq = c*q
+        s = torch.matmul(torch.cat((q, c, cq), 3), self.w).transpose(1, 2)
+        s1 = nn.functional.softmax(s, 1)
+        s2 = nn.functional.softmax(s, 1)
+        
+        a = torch.bmm(s1, query)
+        l = torch.bmm(s1, s2.transpose(1, 2))
+        b = torch.bmm(l, context)
+        output = torch.cat((context, a, context*a, context*b), dim=2)
+        return nn.functional.dropout(output, p=self.dropout)
 
 
-class ModelEncoderLayer(nn.Module):
-    """[summary]
+class ModelEncoderBlock(nn.Module):
+    """Model Encoder Block
 
     Args:
-        nn ([type]): [description]
+        d_model (int): Dimenstion of the input vector
+        sent_len (int): Length of the input sentence
     """
-    def __init__(self, ):
+    def __init__(self, d_model, sent_len, enc_blocks=7, conv_layer=2):
         super(ModelEncoderLayer, self).__init__()
 
-    def forward(self, x):
+        self.model_enc = nn.ModuleList([
+            EncoderBlock(d_model, sent_len, conv_layer=conv_layer),
+            *(EncoderBlock(d_model, sent_len, conv_layer=conv_layer)
+            for _ in range(enc_blocks-1))
+        ])
 
-        return out
+    def forward(self, x):
+        for layer in self.model_enc:
+            x = layer(x)
+        return x
 
 
 class OutputLayer(nn.Module):
     """Takes inputs from 2 of the ModelEncoderLayers
 
     Args:
-        nn ([type]): [description]
+        d_model (int): Dimension of the input vector (should be 128 according to qanet)
     """
-    def __init__(self, ):
+    def __init__(self, d_model):
         super(OutputLayer, self).__init__()
+        self.lin = nn.Linear(in_features=2*d_model,1)
+        self.s = nn.Softmax(dim=2)
 
-    def forward(self, a, b):
-
-        return out
+    def forward(self, in1, in2):
+        x = torch.cat((in1, in2), dim=1)
+        x = self.lin(x.permute(0,2,1)).permmute(0, 2, 1)
+        x = self.soft(x)
+        return x.squeeze()
 
 
 # ---------------- Helper Layers ----------------------        
@@ -136,12 +172,18 @@ class EncoderBlock(nn.Module):
     convolution-layer × # + self-attention-layer + feed-forward-layer
 
     Args:
-        nn ([type]): [description]
+        d_model (int): Dimension of the input vectors
+        sent_len (int): Length of a sentence
+        conv_layer (int): Number of times the conv block is repeated 
+        kernel_size (int): Size of the kernel for 1d convolutions
+        filters (int): Number of filters
+        heads (int): Number of heads in multihead attention
     """
     def __init__(self, d_model, sent_len, conv_layer=4, kernel_size=7, filters=128, heads=8):
         super(EncoderBlock, self).__init__()
 
-        # TODO positional encoding sometime
+        self.pos_enc = PostionalEncoder(sent_len, d_model)
+        
         self.conv1 = nn.Conv1d(d_model, filters, kernel_size, padding=(kernel_size//2))
         self.conv = nn.ModuleList(
             [ConvolutionBlock(c_in=filters,sent_len=sent_len, kernel_size=kernel_size) for _ in range(conv_layer-1)]
@@ -150,12 +192,34 @@ class EncoderBlock(nn.Module):
         self.ff = FeedForwardBlock(filters, filters, sent_len)
 
     def forward(self, x):
+        x = self.pos_enc(x)
         x = self.conv1(x)
         for layer in self.conv:
             x = layer(x)
         x = self.attn(x)
         x = self.ff(x)
         return x
+
+class PostionalEncoder(nn.Module):
+    """Generate positional encoding for a vector
+
+    Args:
+        length (int): length of the input sentence to be encoded
+        d_model (int): dimention of the word vector
+
+    Returns:
+        torch.Tensor: positionaly encoded vector
+    """
+    def __init__(self, length, d_model):
+        super(PositionalEncoder, self).__init__()
+
+        f = torch.Tensor([10000 ** (-i / d_model) if i % 2 == 0 else -10000 ** ((1 - i) / d_model) for i in range(d_model)]).unsqueeze(dim=1)
+        phase = torch.Tensor([0 if i % 2 == 0 else math.pi / 2 for i in range(d_model)]).unsqueeze(dim=1)
+        pos = torch.arange(length).repeat(d_model, 1).to(torch.float)
+        self.pos_encoding = nn.Parameter(torch.sin(torch.add(torch.mul(pos, f), phase)), requires_grad=False)
+
+    def forward(self, x):
+        return x + self.pos_encoding(x)
 
 # -------------------- Residual Blocks ----------------------
 

@@ -6,7 +6,7 @@ import math
 
 # --------------- Model Layers ------------------
 
-class InputEmbeddingBlock(nn.Module):
+class InputEmbeddingLayer(nn.Module):
     """Input Embedding layer used by QANet
     Word embedding of 300 D
 
@@ -23,21 +23,21 @@ class InputEmbeddingBlock(nn.Module):
         emb = self.dropout(emb)
         return emb
 
-class EmbeddingEncodeBlock(nn.Module):
+class EmbeddingEncodeLayer(nn.Module):
     """Embedding Encoder Layer
 
     Args:
         d_model (int): Dimension of the word_vector
         sent_len (int): Length of the sentence
     """
-    def __init__(self, d_model, sent_len):
-        super(EmbeddingEncoderLayer, self).__init__()
-        self.enc_layer = EncoderBlock(d_model, sent_len)
+    def __init__(self, d_model, sent_len, hidden_state):
+        super(EmbeddingEncodeLayer, self).__init__()
+        self.enc_layer = EncoderBlock(d_model, sent_len, filters=hidden_state)
     def forward(self, x):
         return self.enc_layer(x)
 
 
-class CQAttentionBlock(nn.Module):
+class CQAttentionLayer(nn.Module):
     """context query attention layer 
     understood and influenced from https://github.com/tailerr/QANet-pytorch/
 
@@ -51,7 +51,7 @@ class CQAttentionBlock(nn.Module):
 
         w = torch.empty(d_model*3)
         lim = 1/d_model
-        nn.init.uniform_(w, -math.sqrt(lim), m.sqrt(lim))
+        nn.init.uniform_(w, -math.sqrt(lim), math.sqrt(lim))
         self.w = nn.Parameter(w)
 
     def forward(self, context, query):
@@ -73,7 +73,7 @@ class CQAttentionBlock(nn.Module):
         return nn.functional.dropout(output, p=self.dropout)
 
 
-class ModelEncoderBlock(nn.Module):
+class ModelEncoderLayer(nn.Module):
     """Model Encoder Block
 
     Args:
@@ -103,7 +103,7 @@ class OutputLayer(nn.Module):
     """
     def __init__(self, d_model):
         super(OutputLayer, self).__init__()
-        self.lin = nn.Linear(in_features=2*d_model,1)
+        self.lin = nn.Linear(in_features=2*d_model,out_features=1)
         self.s = nn.Softmax(dim=2)
 
     def forward(self, in1, in2):
@@ -182,7 +182,7 @@ class EncoderBlock(nn.Module):
     def __init__(self, d_model, sent_len, conv_layer=4, kernel_size=7, filters=128, heads=8):
         super(EncoderBlock, self).__init__()
 
-        self.pos_enc = PostionalEncoder(sent_len, d_model)
+        self.pos_enc = PositionalEncoder(sent_len, d_model)
         
         self.conv1 = nn.Conv1d(d_model, filters, kernel_size, padding=(kernel_size//2))
         self.conv = nn.ModuleList(
@@ -200,7 +200,7 @@ class EncoderBlock(nn.Module):
         x = self.ff(x)
         return x
 
-class PostionalEncoder(nn.Module):
+class PositionalEncoder(nn.Module):
     """Generate positional encoding for a vector
 
     Args:

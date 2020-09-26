@@ -3,3 +3,4 @@ dev-v2.0.json
 data/*
 save/*
 .vscode/settings.json
+__pycache__

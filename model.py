@@ -22,7 +22,7 @@ class QANet(nn.Module):
         self.c_enc = EmbeddingEncodeLayer(d_model, c_len, hidden_state)
         self.q_enc = EmbeddingEncodeLayer(d_model, q_len, hidden_state)
         self.cqa = CQAttentionLayer(hidden_state)
-        self.model_enc = ModelEncoderLayer(hidden_state, c_len) # XXX hidden_state dim wrong
+        self.model_enc = ModelEncoderLayer(hidden_state, c_len*4) 
         self.start_out = OutputLayer(hidden_state)
         self.end_out = OutputLayer(hidden_state)
 

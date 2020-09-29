@@ -45,7 +45,7 @@ class CQAttentionLayer(nn.Module):
         context (torch.Tensor): Encoded context vectors
         queries (torch.Tensor): Encoded queries vectors
     """
-    def __init__(self, d_model):
+    def __init__(self, d_model, drop_prob=0.1):
         super(CQAttentionLayer, self).__init__()
         self.d_model = d_model
 
@@ -53,8 +53,11 @@ class CQAttentionLayer(nn.Module):
         lim = 1/d_model
         nn.init.uniform_(w, -math.sqrt(lim), math.sqrt(lim))
         self.w = nn.Parameter(w)
+        self.dropout = drop_prob
 
     def forward(self, context, query):
+        context = context.permute(0,2,1)
+        query = query.permute(0,2,1)
         c_len = context.size(1)
         q_len = query.size(1)
         # nn.functional.dropout(context, self.dropout, self.training, True)
@@ -69,8 +72,8 @@ class CQAttentionLayer(nn.Module):
         a = torch.bmm(s1, query)
         l = torch.bmm(s1, s2.transpose(1, 2))
         b = torch.bmm(l, context)
-        output = torch.cat((context, a, context*a, context*b), dim=2)
-        return nn.functional.dropout(output, p=self.dropout)
+        output = torch.cat((context, a, context*a, context*b), dim=1)
+        return nn.functional.dropout(output, p=self.dropout).permute(0,2,1)
 
 
 class ModelEncoderLayer(nn.Module):
@@ -108,8 +111,8 @@ class OutputLayer(nn.Module):
 
     def forward(self, in1, in2):
         x = torch.cat((in1, in2), dim=1)
-        x = self.lin(x.permute(0,2,1)).permmute(0, 2, 1)
-        x = self.soft(x)
+        x = self.lin(x.permute(0,2,1)).permute(0, 2, 1)
+        x = self.s(x)
         return x.squeeze()
 
 
@@ -183,10 +186,9 @@ class EncoderBlock(nn.Module):
         super(EncoderBlock, self).__init__()
 
         self.pos_enc = PositionalEncoder(sent_len, d_model)
-        
-        self.conv1 = nn.Conv1d(d_model, filters, kernel_size, padding=(kernel_size//2))
+        self.conv1 = ConvolutionBlock(d_model, filters, sent_len, kernel_size)
         self.conv = nn.ModuleList(
-            [ConvolutionBlock(c_in=filters,sent_len=sent_len, kernel_size=kernel_size) for _ in range(conv_layer-1)]
+            [ConvolutionBlock(c_in=filters, c_out=filters ,sent_len=sent_len, kernel_size=kernel_size) for _ in range(conv_layer-1)]
         )
         self.attn = SelfAttentionBlock(filters, sent_len)
         self.ff = FeedForwardBlock(filters, filters, sent_len)
@@ -219,17 +221,23 @@ class PositionalEncoder(nn.Module):
         self.pos_encoding = nn.Parameter(torch.sin(torch.add(torch.mul(pos, f), phase)), requires_grad=False)
 
     def forward(self, x):
-        return x + self.pos_encoding(x)
+        return x + self.pos_encoding[0:x.size(1)]
 
 # -------------------- Residual Blocks ----------------------
 
 class ConvolutionBlock(nn.Module):
-    def __init__(self, c_in, sent_len, kernel_size):
+    def __init__(self, c_in, c_out, sent_len, kernel_size):
         super(ConvolutionBlock, self).__init__()
-        self.conv = nn.Conv1d(c_in, c_in, kernel_size, bias=False, padding=(kernel_size//2))
+        self.c_in = c_in
+        self.c_out = c_out
+        self.conv = nn.Conv1d(c_in, c_out, kernel_size, bias=False, padding=(kernel_size//2))
         self.layer_norm = nn.LayerNorm([c_in, sent_len]) 
+        self.w_s = nn.Linear(c_in, c_out)
     def forward(self, x):
-        return x + self.conv(self.layer_norm(x))
+        ln = self.layer_norm(x)
+        if (self.c_in != self.c_out):
+            x = self.w_s(x.permute(0, 2, 1)).permute(0, 2, 1)
+        return x + self.conv(ln)
 
 class SelfAttentionBlock(nn.Module):
     def __init__(self, d_model, sent_len):
@@ -257,6 +265,19 @@ class FeedForwardBlock(nn.Module):
 
 
 if __name__ == "__main__":
-    a = torch.randn((2, 300, 32))
-    enc_block = EncoderBlock(300, 32)
-    print(enc_block(a).size())
+    c = torch.randn((2, 300, 32))
+    q = torch.randn((2, 300, 16))
+
+    enc = EmbeddingEncodeLayer(300, 32, 128)
+    encq = EmbeddingEncodeLayer(300, 16, 128)
+    cqa = CQAttentionLayer(128, 0.5)
+    modenc = ModelEncoderLayer(128, 32*4)
+    start = OutputLayer(128)
+
+    ans = cqa(enc(c),encq(q))
+    ans1 = modenc(ans)
+    ans2 = modenc(ans1)
+    ans3 = modenc(ans2)
+
+    print("All the functions are dimentionally correct!")
+    print("Only the input embedding class is not checked by this script.")

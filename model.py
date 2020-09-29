@@ -30,7 +30,7 @@ class QANet(nn.Module):
         c_emb_enc = self.c_emb(context)  # (batch_size, hidden_size, c_len)
         q_emb_enc  = self.q_emb(question)  # (batch_size, hidden_size, q_len)
 
-        qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, , c_len)
+        qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, c_len*4, c_len)
 
         mod_enc_1 = self.model_enc(qc_att)  # (batch_size, hidden_size, c_len)
         mod_enc_2 = self.model_enc(mod_enc_1)  # (batch_size, hidden_size, c_len)

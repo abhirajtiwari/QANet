@@ -44,4 +44,9 @@ class QANet(nn.Module):
         return start_out, end_out
 
 if __name__ == "__main__":
+    word_vec = torch.randn(2,3)
+    ctx = torch.randn((2, 300, 200))
+    q = torch.randn((2, 300, 100))
+    qanet = QANet(word_vec)
     print("Hello, QANet")
+    print(qanet(ctx, q))

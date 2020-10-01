@@ -72,7 +72,7 @@ class CQAttentionLayer(nn.Module):
         a = torch.bmm(s1, query)
         l = torch.bmm(s1, s2.transpose(1, 2))
         b = torch.bmm(l, context)
-        output = torch.cat((context, a, context*a, context*b), dim=1)
+        output = torch.cat((context, a, context*a, context*b), dim=2) # XXX concat over hidden_state only
         return nn.functional.dropout(output, p=self.dropout).permute(0,2,1)
 
 
@@ -271,13 +271,20 @@ if __name__ == "__main__":
     enc = EmbeddingEncodeLayer(300, 32, 128)
     encq = EmbeddingEncodeLayer(300, 16, 128)
     cqa = CQAttentionLayer(128, 0.5)
-    modenc = ModelEncoderLayer(128, 32*4)
+    cq_conv = ConvolutionBlock(4*128, 128, 32, 5)
+    modenc = ModelEncoderLayer(128, 32)
     start = OutputLayer(128)
+    end = OutputLayer(128)
 
     ans = cqa(enc(c),encq(q))
+    ans = cq_conv(ans) # XXX this makes the dimensions right
     ans1 = modenc(ans)
     ans2 = modenc(ans1)
     ans3 = modenc(ans2)
+    
+    s_p = start(ans1, ans2)
+    e_p = end(ans1, ans3)
 
+    print (s_p.size(), e_p.size())
     print("All the functions are dimentionally correct!")
     print("Only the input embedding class is not checked by this script.")

@@ -15,15 +15,15 @@ class QANet(nn.Module):
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
     
-    def __init__(self, word_vectors, d_model=300, c_len=100, q_len=100, hidden_state=128):
+    def __init__(self, word_vectors, d_model=300, c_len=100, q_len=100, hidden_state=128 ,heads=8):
         super(QANet, self).__init__()
         self.c_emb = InputEmbeddingLayer(word_vectors)
         self.q_emb = InputEmbeddingLayer(word_vectors)
-        self.c_enc = EmbeddingEncodeLayer(d_model, c_len, hidden_state)
-        self.q_enc = EmbeddingEncodeLayer(d_model, q_len, hidden_state)
+        self.c_enc = EmbeddingEncodeLayer(d_model, c_len, hidden_state, heads=heads)
+        self.q_enc = EmbeddingEncodeLayer(d_model, q_len, hidden_state, heads=heads)
         self.cqa = CQAttentionLayer(hidden_state)
         self.cq_conv = ConvolutionBlock(hidden_state*4, hidden_state, c_len, 5)
-        self.model_enc = ModelEncoderLayer(hidden_state, c_len) 
+        self.model_enc = ModelEncoderLayer(hidden_state, c_len, heads=heads) 
         self.start_out = OutputLayer(hidden_state)
         self.end_out = OutputLayer(hidden_state)
 

@@ -30,9 +30,9 @@ class EmbeddingEncodeLayer(nn.Module):
         d_model (int): Dimension of the word_vector
         sent_len (int): Length of the sentence
     """
-    def __init__(self, d_model, sent_len, hidden_state):
+    def __init__(self, d_model, sent_len, hidden_state, heads=8):
         super(EmbeddingEncodeLayer, self).__init__()
-        self.enc_layer = EncoderBlock(d_model, sent_len, filters=hidden_state)
+        self.enc_layer = EncoderBlock(d_model, sent_len, filters=hidden_state, heads=heads)
     def forward(self, x):
         return self.enc_layer(x)
 
@@ -83,12 +83,12 @@ class ModelEncoderLayer(nn.Module):
         d_model (int): Dimenstion of the input vector
         sent_len (int): Length of the input sentence
     """
-    def __init__(self, d_model, sent_len, enc_blocks=7, conv_layer=2):
+    def __init__(self, d_model, sent_len, enc_blocks=7, conv_layer=2, heads=8):
         super(ModelEncoderLayer, self).__init__()
 
         self.model_enc = nn.ModuleList([
-            EncoderBlock(d_model, sent_len, conv_layer=conv_layer),
-            *(EncoderBlock(d_model, sent_len, conv_layer=conv_layer)
+            EncoderBlock(d_model, sent_len, conv_layer=conv_layer, heads=heads),
+            *(EncoderBlock(d_model, sent_len, conv_layer=conv_layer, heads=heads)
             for _ in range(enc_blocks-1))
         ])
 
@@ -190,7 +190,7 @@ class EncoderBlock(nn.Module):
         self.conv = nn.ModuleList(
             [ConvolutionBlock(c_in=filters, c_out=filters ,sent_len=sent_len, kernel_size=kernel_size) for _ in range(conv_layer-1)]
         )
-        self.attn = SelfAttentionBlock(filters, sent_len)
+        self.attn = SelfAttentionBlock(filters, sent_len, heads)
         self.ff = FeedForwardBlock(filters, filters, sent_len)
 
     def forward(self, x):
@@ -240,9 +240,9 @@ class ConvolutionBlock(nn.Module):
         return x + self.conv(ln)
 
 class SelfAttentionBlock(nn.Module):
-    def __init__(self, d_model, sent_len):
+    def __init__(self, d_model, sent_len, heads):
         super(SelfAttentionBlock, self).__init__()
-        self.self_attn = SelfAttention(d_model)
+        self.self_attn = SelfAttention(d_model,heads)
         self.layer_norm = nn.LayerNorm([d_model, sent_len]) 
     def forward(self, x):
         a = self.layer_norm(x)

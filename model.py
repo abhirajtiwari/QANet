@@ -22,7 +22,8 @@ class QANet(nn.Module):
         self.c_enc = EmbeddingEncodeLayer(d_model, c_len, hidden_state)
         self.q_enc = EmbeddingEncodeLayer(d_model, q_len, hidden_state)
         self.cqa = CQAttentionLayer(hidden_state)
-        self.model_enc = ModelEncoderLayer(hidden_state, c_len*4) 
+        self.cq_conv = ConvolutionBlock(hidden_state*4, hidden_state, c_len, 5)
+        self.model_enc = ModelEncoderLayer(hidden_state, c_len) 
         self.start_out = OutputLayer(hidden_state)
         self.end_out = OutputLayer(hidden_state)
 
@@ -30,7 +31,8 @@ class QANet(nn.Module):
         c_emb_enc = self.c_emb(context)  # (batch_size, hidden_size, c_len)
         q_emb_enc  = self.q_emb(question)  # (batch_size, hidden_size, q_len)
 
-        qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, c_len*4, c_len)
+        qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, hidden_size*4, c_len)
+        qc_att = self.cq_conv(qc_att) # (batch_size, hidden_size, c_len)
 
         mod_enc_1 = self.model_enc(qc_att)  # (batch_size, hidden_size, c_len)
         mod_enc_2 = self.model_enc(mod_enc_1)  # (batch_size, hidden_size, c_len)

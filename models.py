@@ -1,5 +1,6 @@
 import torch
 from layers import *
+from util import torch_from_json
 
 class QANet(nn.Module):
     """QANet model for SQuAD 2.0
@@ -15,7 +16,7 @@ class QANet(nn.Module):
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
     
-    def __init__(self, word_vectors, d_model=300, c_len=100, q_len=100, hidden_state=128 ,heads=8):
+    def __init__(self, word_vectors, d_model=300, c_len=200, q_len=100, hidden_state=128 ,heads=8):
         super(QANet, self).__init__()
         self.c_emb = InputEmbeddingLayer(word_vectors)
         self.q_emb = InputEmbeddingLayer(word_vectors)
@@ -31,6 +32,9 @@ class QANet(nn.Module):
         c_emb_enc = self.c_emb(context)  # (batch_size, hidden_size, c_len)
         q_emb_enc  = self.q_emb(question)  # (batch_size, hidden_size, q_len)
 
+        c_emb_enc = self.c_enc(c_emb_enc)
+        q_emb_enc = self.q_enc(q_emb_enc)
+
         qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, hidden_size*4, c_len)
         qc_att = self.cq_conv(qc_att) # (batch_size, hidden_size, c_len)
 
@@ -44,9 +48,9 @@ class QANet(nn.Module):
         return start_out, end_out
 
 if __name__ == "__main__":
-    word_vec = torch.randn(2,3)
-    ctx = torch.randn((2, 300, 200))
-    q = torch.randn((2, 300, 100))
+    word_vec = torch_from_json("data/word_emb.json")
+    ctx = torch.rand((2, 200)).to(torch.int64)
+    q = torch.rand((2, 100)).to(torch.int64)
     qanet = QANet(word_vec)
     print("Hello, QANet")
     print(qanet(ctx, q))

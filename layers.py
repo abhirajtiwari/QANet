@@ -21,7 +21,7 @@ class InputEmbeddingLayer(nn.Module):
     def forward(self, x):
         emb = self.embedding(x) # (batch_size, sequence_length, p1)
         emb = self.dropout(emb)
-        return emb
+        return emb.permute(0,2,1)
 
 class EmbeddingEncodeLayer(nn.Module):
     """Embedding Encoder Layer

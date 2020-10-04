@@ -29,11 +29,11 @@ class QANet(nn.Module):
         self.end_out = OutputLayer(hidden_state)
 
     def forward(self, context, question):
-        c_emb_enc = self.c_emb(context)  # (batch_size, hidden_size, c_len)
-        q_emb_enc  = self.q_emb(question)  # (batch_size, hidden_size, q_len)
+        c_emb_enc = self.c_emb(context)  # (batch_size, d_model, c_len)
+        q_emb_enc  = self.q_emb(question)  # (batch_size, d_model, q_len)
 
-        c_emb_enc = self.c_enc(c_emb_enc)
-        q_emb_enc = self.q_enc(q_emb_enc)
+        c_emb_enc = self.c_enc(c_emb_enc) # (batch_size, hidden_state, c_len)
+        q_emb_enc = self.q_enc(q_emb_enc) # (batch_size, hidden_state, q_len)
 
         qc_att = self.cqa(c_emb_enc, q_emb_enc)  # (batch_size, hidden_size*4, c_len)
         qc_att = self.cq_conv(qc_att) # (batch_size, hidden_size, c_len)

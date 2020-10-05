@@ -127,7 +127,6 @@ class SelfAttention(nn.Module):
         h (int): number of heads
     """
     def __init__(self, d_model, h=8):
-        assert(d_model%h == 0)
         super(SelfAttention, self).__init__()
         self.d_model = d_model
         self.h = h

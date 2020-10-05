@@ -83,7 +83,7 @@ class ModelEncoderLayer(nn.Module):
         d_model (int): Dimenstion of the input vector
         sent_len (int): Length of the input sentence
     """
-    def __init__(self, d_model, sent_len, enc_blocks=7, conv_layer=2, heads=8):
+    def __init__(self, d_model, sent_len, enc_blocks=4, conv_layer=2, heads=8):
         super(ModelEncoderLayer, self).__init__()
 
         self.model_enc = nn.ModuleList([
@@ -182,7 +182,7 @@ class EncoderBlock(nn.Module):
         filters (int): Number of filters
         heads (int): Number of heads in multihead attention
     """
-    def __init__(self, d_model, sent_len, conv_layer=4, kernel_size=7, filters=128, heads=8):
+    def __init__(self, d_model, sent_len, conv_layer=3, kernel_size=7, filters=128, heads=8):
         super(EncoderBlock, self).__init__()
 
         self.pos_enc = PositionalEncoder(sent_len, d_model)

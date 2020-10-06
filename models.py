@@ -16,7 +16,7 @@ class QANet(nn.Module):
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
     
-    def __init__(self, word_vectors, d_model=300, c_len=200, q_len=100, hidden_state=128 ,heads=8):
+    def __init__(self, word_vectors, d_model=300, c_len=200, q_len=100, hidden_state=128 ,heads=8, log_softmax=False):
         super(QANet, self).__init__()
         self.c_emb = InputEmbeddingLayer(word_vectors)
         self.q_emb = InputEmbeddingLayer(word_vectors)
@@ -25,8 +25,8 @@ class QANet(nn.Module):
         self.cqa = CQAttentionLayer(hidden_state)
         self.cq_conv = ConvolutionBlock(hidden_state*4, hidden_state, c_len, 5)
         self.model_enc = ModelEncoderLayer(hidden_state, c_len, heads=heads) 
-        self.start_out = OutputLayer(hidden_state)
-        self.end_out = OutputLayer(hidden_state)
+        self.start_out = OutputLayer(hidden_state, log_softmax=log_softmax)
+        self.end_out = OutputLayer(hidden_state, log_softmax=log_softmax)
 
     def forward(self, context, question):
         c_emb_enc = self.c_emb(context)  # (batch_size, d_model, c_len)
@@ -51,6 +51,6 @@ if __name__ == "__main__":
     word_vec = torch_from_json("data/word_emb.json")
     ctx = torch.rand((2, 200)).to(torch.int64)
     q = torch.rand((2, 100)).to(torch.int64)
-    qanet = QANet(word_vec)
+    qanet = QANet(word_vec, log_softmax=True)
     print("Hello, QANet")
     print(qanet(ctx, q))

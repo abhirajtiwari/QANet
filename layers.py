@@ -104,15 +104,15 @@ class OutputLayer(nn.Module):
     Args:
         d_model (int): Dimension of the input vector (should be 128 according to qanet)
     """
-    def __init__(self, d_model):
+    def __init__(self, d_model, log_softmax=False):
         super(OutputLayer, self).__init__()
         self.lin = nn.Linear(in_features=2*d_model,out_features=1)
-        self.s = nn.Softmax(dim=2)
+        self.s = F.log_softmax if log_softmax==True else F.softmax
 
     def forward(self, in1, in2):
         x = torch.cat((in1, in2), dim=1)
         x = self.lin(x.permute(0,2,1)).permute(0, 2, 1)
-        x = self.s(x)
+        x = self.s(x, dim=2)
         return x.squeeze()
 
 

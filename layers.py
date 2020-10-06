@@ -13,6 +13,7 @@ import torch.nn.functional as F
 # --------------- Model Layers ------------------
 class InputEmbeddingLayer(nn.Module):
     """Embedding layer used in QANet, without character-level embedding.
+    Word embedding of 300-D
     """
     def __init__(self, word_vectors, drop_prob=0.1):
         """
@@ -21,8 +22,8 @@ class InputEmbeddingLayer(nn.Module):
         """
         super(InputEmbeddingLayer, self).__init__()
 
-        self.dropout = torch.nn.Dropout(drop_prob) 
         self.embed = nn.Embedding.from_pretrained(word_vectors)
+        self.dropout = torch.nn.Dropout(drop_prob) 
         
     def forward(self, x):
         """Looks up word embeddings for the words in a batch of sentences.
@@ -401,15 +402,6 @@ class FeedForwardBlock(nn.Module):
         x_l = self.layer_norm(x)  # (batch_size, hidden_size, sent_len)
         x = x + self.ff(x_l.permute(0, 2, 1)).permute(0, 2, 1)  # (batch_size, hidden_size, sent_len)
         return x
-
-
-# if __name__ == "__main__":
-#     torch.manual_seed(0)
-
-#     x = torch.randn((32, 300, 100))  # (batch_size, word_embed, sent_len)
-#     a = SelfAttention(128, 100, 8, 0.)(x)
-#     print(a.shape)
-
 
 
 if __name__ == "__main__":

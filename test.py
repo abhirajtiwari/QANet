@@ -21,7 +21,8 @@ import util
 from args import get_test_args
 from collections import OrderedDict
 from json import dumps
-from models import BiDAF
+# from models import BiDAF
+from models import QANet
 from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -43,7 +44,9 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
+    # model = BiDAF(word_vectors=word_vectors,
+    #               hidden_size=args.hidden_size)
+    model = QANet(word_vectors=word_vectors,
                   hidden_size=args.hidden_size)
     model = nn.DataParallel(model, gpu_ids)
     log.info(f'Loading checkpoint from {args.load_path}...')

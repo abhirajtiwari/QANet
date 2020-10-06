@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 
-class QANET(nn.Module):
+class QANet(nn.Module):
     """QANet model for SQuAD 2.0
 
     Based on the paper:
@@ -25,7 +25,7 @@ class QANET(nn.Module):
         - Model Encoder Layer: Encode the sequence again.
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
-    def __init__(self, word_vectors, hidden_size=128, drop_prob=0., c_len=1, q_len=1, word_embed=300):
+    def __init__(self, word_vectors, hidden_size=128, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8):
         """Init QANET Model.
         
         @param word_vectors (torch.Tensor): Pre-trained word vectors.
@@ -35,14 +35,14 @@ class QANET(nn.Module):
         @param q_len (int): Question sentence length. 
         @param word_embed (int): Pretrained word vector size. 
         """
-        super(QANET, self).__init__()
+        super(QANet, self).__init__()
         self.c_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
         self.q_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
         self.c_emb_enc = layers.EmbeddingEncoderLayer(
             conv_layers=4, 
             kernel_size=7,
             filters=128, 
-            heads=8, 
+            heads=heads, 
             enc_blocks=1,
             drop_prob=drop_prob,
             sent_len=c_len, 
@@ -53,7 +53,7 @@ class QANET(nn.Module):
             conv_layers=4,
             kernel_size=7,
             filters=128,
-            heads=8,
+            heads=heads,
             enc_blocks=1,
             drop_prob=drop_prob,
             sent_len=q_len,
@@ -65,12 +65,12 @@ class QANET(nn.Module):
         self.mod_enc = layers.ModelEncoderLayer(
             conv_layers=2,
             kernel_size=5,
-            filters=128,
-            heads=8,
+            filters=128, 
+            heads=heads,
             enc_blocks=7,
-            drop_prob=drop_prob, 
-            sent_len=c_len,
-            word_embed=hidden_size,  
+            drop_prob=drop_prob,
+            sent_len=c_len, 
+            word_embed=hidden_size, 
             hidden_size=hidden_size
         )
         self.start_out = layers.OutputLayer(drop_prob=drop_prob, word_embed=hidden_size) 
@@ -111,15 +111,16 @@ class QANET(nn.Module):
 if __name__ == "__main__":
     torch.manual_seed(0)
     
-    word_vec = torch_from_json("data/word_emb.json")
-    context = torch.randn((2, 10, 20))
-    question = torch.randn((2, 10, 10))
+    word_vec = torch_from_json("./data/word_emb.json")
+    # word_vec = torch.randn(2, 3)
+    context = torch.rand((2, 200)).to(torch.int64)
+    question = torch.rand((2, 100)).to(torch.int64)
     # answer = torch.randn((32, 300, 150))  # part of context
 
 
-    qanet = QANET(word_vec, hidden_size=8, drop_prob=0., c_len=20, q_len=10, word_embed=300)
+    qanet = QANet(word_vec, hidden_size=8, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8)
     r = qanet(context, question)[0]
     
     print("Final score shape:")
     print(r.shape)
-    print(r)
+    # print(r)

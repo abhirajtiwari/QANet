@@ -4,10 +4,10 @@ Authors:
     Sahil Khose (sahilkhose18@gmail.com)
     Abhiraj Tiwari (abhirajtiwari@gmail.com)
 """
+from util import torch_from_json
 import layers
 import torch
 import torch.nn as nn
-import torch.nn.functional as F 
 
 
 class QANET(nn.Module):
@@ -36,14 +36,8 @@ class QANET(nn.Module):
         @param word_embed (int): Pretrained word vector size. 
         """
         super(QANET, self).__init__()
-        self.c_emb = layers.InputEmbeddingLayer(
-            word_vectors=word_vectors,
-            drop_prob=0.1
-        )
-        self.q_emb = layers.InputEmbeddingLayer(
-            word_vectors=word_vectors,
-            drop_prob=0.1
-        )
+        self.c_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
+        self.q_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
         self.c_emb_enc = layers.EmbeddingEncoderLayer(
             conv_layers=4, 
             kernel_size=7,
@@ -66,9 +60,8 @@ class QANET(nn.Module):
             word_embed=word_embed,
             hidden_size=hidden_size
         )
-        self.qc_att = layers.CQAttentionLayer(
-            drop_prob=drop_prob
-        )
+        self.qc_att = layers.CQAttentionLayer(hidden_size=hidden_size, drop_prob=drop_prob)
+        self.qc_conv = layers.ConvBlock(word_embed=hidden_size*4, sent_len=c_len, hidden_size=hidden_size, kernel_size=5)
         self.mod_enc = layers.ModelEncoderLayer(
             conv_layers=2,
             kernel_size=5,
@@ -77,17 +70,11 @@ class QANET(nn.Module):
             enc_blocks=7,
             drop_prob=drop_prob, 
             sent_len=c_len,
-            word_embed=hidden_size,  # FIXME new dim: [c, a, c.a, c.b]: qc_att.shape[1]
+            word_embed=hidden_size,  
             hidden_size=hidden_size
         )
-        self.start_out = layers.OutputLayer(
-            drop_prob=drop_prob,
-            word_embed=hidden_size  # FIXME new dim: model_enc.shape[1], I think this is right
-        )
-        self.end_out = layers.OutputLayer(
-            drop_prob=drop_prob,
-            word_embed=hidden_size  # FIXME new dim: model_enc.shape[1] 
-        )
+        self.start_out = layers.OutputLayer(drop_prob=drop_prob, word_embed=hidden_size) 
+        self.end_out = layers.OutputLayer(drop_prob=drop_prob, word_embed=hidden_size)  
 
     def forward(self, context, question):
         """ Take a mini-batch of context and question sentences, compute the log-likelihood of each 
@@ -101,17 +88,19 @@ class QANET(nn.Module):
         @returns start_out (Tensor): Start probability distribution.
         @returns end_out (Tensor): End probability distribution.
         """
-        # c_emb = self.c_emb(context)  # (batch_size, word_embed, c_len)
-        # q_emb = self.q_emb(question)  # (batch_size, word_embed, q_len)
+        c_emb = self.c_emb(context)  # (batch_size, word_embed, c_len)
+        q_emb = self.q_emb(question)  # (batch_size, word_embed, q_len)
 
-        c_emb_enc = self.c_emb_enc(context)  # (batch_size, hidden_size, c_len)
-        q_emb_enc  = self.q_emb_enc(question)  # (batch_size, hidden_size, q_len)
+        c_emb_enc = self.c_emb_enc(c_emb)  # (batch_size, hidden_size, c_len)
+        q_emb_enc  = self.q_emb_enc(q_emb)  # (batch_size, hidden_size, q_len)
 
-        qc_att = self.qc_att(c_emb_enc, q_emb_enc)  # (batch_size, , c_len)
+        qc_att = self.qc_att(c_emb_enc, q_emb_enc)  # (batch_size, 4*hidden_size, c_len)
+        qc_conv = self.qc_conv(qc_att)  # (batch_size, hidden_size, c_len)
 
-        mod_enc_1 = self.mod_enc(qc_att)  # (batch_size, hidden_size, c_len)
+        mod_enc_1 = self.mod_enc(qc_conv)  # (batch_size, hidden_size, c_len)
         mod_enc_2 = self.mod_enc(mod_enc_1)  # (batch_size, hidden_size, c_len)
         mod_enc_3 = self.mod_enc(mod_enc_2)  # (batch_size, hidden_size, c_len)
+
 
         start_out = self.start_out(mod_enc_1, mod_enc_2)  # (batch_size, c_len)
         end_out = self.end_out(mod_enc_1, mod_enc_3)  # (batch_size, c_len)
@@ -121,14 +110,16 @@ class QANET(nn.Module):
 
 if __name__ == "__main__":
     torch.manual_seed(0)
-
-    context = torch.randn((32, 300, 200))
-    question = torch.randn((32, 300, 100))
+    
+    word_vec = torch_from_json("data/word_emb.json")
+    context = torch.randn((2, 10, 20))
+    question = torch.randn((2, 10, 10))
     # answer = torch.randn((32, 300, 150))  # part of context
 
-    word_vectors = torch.randn((2, 3))
 
-    qanet = QANET(word_vectors, hidden_size=128,
-                  drop_prob=0., c_len=200, q_len=100, word_embed=300)
+    qanet = QANET(word_vec, hidden_size=8, drop_prob=0., c_len=20, q_len=10, word_embed=300)
+    r = qanet(context, question)[0]
+    
     print("Final score shape:")
-    print(qanet(context, question)[0].shape)
+    print(r.shape)
+    print(r)

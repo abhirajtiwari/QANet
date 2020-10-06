@@ -4,6 +4,7 @@ Authors:
     Sahil Khose (sahilkhose18@gmail.com)
     Abhiraj Tiwari (abhirajtiwari@gmail.com)
 """
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,14 +14,14 @@ import torch.nn.functional as F
 class InputEmbeddingLayer(nn.Module):
     """Embedding layer used in QANet, without character-level embedding.
     """
-    def __init__(self, word_vectors, drop_prob):
+    def __init__(self, word_vectors, drop_prob=0.1):
         """
         @param word_vectors (torch.Tensor): Pre-trained word vectors.
         @param drop_prob (float): Probability of zero-ing out activations.
         """
         super(InputEmbeddingLayer, self).__init__()
 
-        self.drop_prob = drop_prob 
+        self.dropout = torch.nn.Dropout(drop_prob) 
         self.embed = nn.Embedding.from_pretrained(word_vectors)
         
     def forward(self, x):
@@ -28,9 +29,9 @@ class InputEmbeddingLayer(nn.Module):
         @param x (torch.Tensor): (batch_size, sent_len)
         @returns emb (torch.Tensor): Word embeddings for the batch of sentences. (batch_size, word_embed, sent_len)
         """
-        emb = self.embed(x)  # (batch_size, word_embed, sent_len)
-        emb = F.dropout(emb, self.drop_prob, self.training)  # (batch_size, word_embed, sent_len)
-        return emb  
+        emb = self.embed(x)  # (batch_size, sent_len, word_embed)
+        emb = self.dropout(emb)  # (batch_size, sent_len, word_embed)
+        return emb.permute(0, 2, 1)  # (batch_size, word_embed, sent_len)
 
 
 class EmbeddingEncoderLayer(nn.Module):
@@ -52,10 +53,10 @@ class EmbeddingEncoderLayer(nn.Module):
         super(EmbeddingEncoderLayer, self).__init__()
 
         self.emb_enc = nn.ModuleList([
-            EncoderBlock(conv_layers, kernel_size,
-                                  filters, heads, drop_prob, sent_len, word_embed=word_embed, hidden_size=hidden_size),
+            EncoderBlock(conv_layers, kernel_size, 
+                        filters, heads, drop_prob, sent_len, word_embed=word_embed, hidden_size=hidden_size),
             *(EncoderBlock(conv_layers, kernel_size,
-                                    filters, heads, drop_prob, sent_len, word_embed=hidden_size, hidden_size=hidden_size)
+                            filters, heads, drop_prob, sent_len, word_embed=hidden_size, hidden_size=hidden_size)
               for _ in range(enc_blocks-1))
         ])
 
@@ -66,25 +67,60 @@ class EmbeddingEncoderLayer(nn.Module):
         """
         for layer in self.emb_enc:
             x = layer(x)  # (batch_size, hidden_size, sent_len)
-        return x
+        return x  # (batch_size, hidden_size, sent_len)
 
 
 class CQAttentionLayer(nn.Module):
     """Context Query Attention Layer.
     Takes 2 inputs: Context Encoded Embedding and Question Encoded Embedding. 
+    Understood and Influenced from https://github.com/tailerr/QANet-pytorch/
     """
-    def __init__(self, drop_prob):
+    def __init__(self, hidden_size, drop_prob=0.1):
         """
         @param drop_prob (float): Probability of zero-ing out activations.
         """
         super(CQAttentionLayer, self).__init__()
+        self.hidden_size = hidden_size
+
+        w = torch.empty(hidden_size*3)  # (3*hidden_size)
+        lim = 1/hidden_size
+        nn.init.uniform_(w, -math.sqrt(lim), math.sqrt(lim))
+        self.w = nn.Parameter(w)
+        self.drop_prob = drop_prob
 
     def forward(self, context, question):
         """
         @param context (torch.Tensor): Encoded context embedding. (batch_size, hidden_size, c_len)
         @param question (torch.Tensor): Encoded question embedding. (batch_size, hidden_size, q_len)
         """
-        return context  # (batch_size, hidden_size, c_len)
+        context = context.permute(0, 2, 1)  # (batch_size, c_len, hidden_size)
+        query = question.permute(0, 2, 1)  # (batch_size, q_len, hidden_size)
+
+        c_len = context.size(1)
+        q_len = query.size(1)
+        # nn.functional.dropout(context, self.dropout, self.training, True)
+        # nn.functional.dropout(query, self.dropout, self.training, True)
+
+        c = context.repeat(q_len, 1, 1, 1).permute([1, 0, 2, 3])  
+        # (q_len, batch_size, c_len, hidden_size) --> (batch_size, q_len, c_len, hidden_size) 
+
+        q = query.repeat(c_len, 1, 1, 1).permute([1, 2, 0, 3])  
+        # (c_len, batch_size, q_len, hidden_size) --> (batch_size, q_len, c_len, hidden_size)
+        
+        cq = c*q  # (batch_size, q_len, c_len, hidden_size)
+        # s = torch.matmul(torch.cat((q, c, cq), 3), self.w).transpose(1, 2)
+        s = (torch.cat((q, c, cq), dim=3) @ self.w).transpose(1, 2)
+        # (batch_size, q_len, c_len, 3*hidden_size) --> (batch_size, q_len, c_len) --> (batch_size, c_len, q_len)
+
+        s1 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
+        s2 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
+
+        a = torch.bmm(s1, query)  # (batch_size, c_len, hidden_size)
+        l = torch.bmm(s1, s2.transpose(1, 2))  # (batch_size, c_len, c_len)
+        b = torch.bmm(l, context)  # (batch_size, c_len, hidden_size)
+        # * concat over hidden_state only
+        output = torch.cat((context, a, context*a, context*b), dim=2)  # (batch_size, c_len, 4*hidden_size)
+        return nn.functional.dropout(output, p=self.drop_prob).permute(0, 2, 1)  # (batch_size, 4*hidden_size, c_len)
 
 
 class ModelEncoderLayer(nn.Module):
@@ -130,7 +166,7 @@ class OutputLayer(nn.Module):
     def __init__(self, drop_prob, word_embed):
         """
         @param drop_prob (float): Probability of zero-ing out activations.
-        @param word_embed (int): Word vector size.
+        @param word_embed (int): Word vector size. (128)
         """
         super(OutputLayer, self).__init__()
         self.ff = nn.Linear(2*word_embed, 1)
@@ -165,8 +201,7 @@ class EncoderBlock(nn.Module):
         """
         super(EncoderBlock, self).__init__()
 
-        self.pos_enc = nn.Embedding(sent_len, word_embed)
-
+        self.pos_enc = PositionalEncoder(sent_len, word_embed)
         self.conv = nn.ModuleList([
             ConvBlock(word_embed=word_embed, sent_len=sent_len,
                         hidden_size=hidden_size, kernel_size=kernel_size),
@@ -174,53 +209,105 @@ class EncoderBlock(nn.Module):
                       hidden_size=hidden_size, kernel_size=kernel_size)
             for _ in range(conv_layers - 1))
         ])
-        self.att = SelfAttentionBlock(
-            hidden_size=hidden_size, sent_len=sent_len, heads=heads, drop_prob=drop_prob)
-        self.ff = FeedForwardBlock(
-            hidden_size=hidden_size, sent_len=sent_len)
+        self.att = SelfAttentionBlock(hidden_size=hidden_size, sent_len=sent_len, heads=heads, drop_prob=drop_prob)
+        self.ff = FeedForwardBlock(hidden_size=hidden_size, sent_len=sent_len)
 
     def forward(self, x):
         """Encodes the word vectors.
         @param x (torch.Tensor): Word vectors. (batch_size, word_embed, sent_len)
         @returns x (torch.Tensor): Encoded Word embeddings. (batch_size, hidden_size, sent_len)
         """
-        N, word_embed, sent_len = x.shape  # N: batch_sizes
-        positions = torch.arange(0, sent_len).expand(N, sent_len) 
-
-        # Add positional Encoding:
-        x = x.permute(0, 2, 1) + self.pos_enc(positions)  # (batch_size, word_embed, sent_len)
-        x = x.permute(0, 2, 1)  # (batch_size, word_embed, sent_len)
-
-        # Layer_norm -> conv 
+        x = self.pos_enc(x)  # (batch_size, hidden_size, sent_len)
         for layer in self.conv:
             x = layer(x)  # (batch_size, hidden_size, sent_len)
-
-        # Layer_norm -> Self Attention
         x = self.att(x)  # (batch_size, hidden_size, sent_len)
-        # Layer_norm -> Feed Forward
         x = self.ff(x)  # (batch_size, hidden_size, sent_len)
         return x
 
 
-# class SelfAttention(nn.Module):
-#     """Self Attention used in Self Attention Block for Encoder Block.
-#     """
+class PositionalEncoder(nn.Module):
+    """Generate positional encoding for a vector
+    Args:
+        length (int): length of the input sentence to be encoded
+        d_model (int): dimention of the word vector
+    Returns:
+        torch.Tensor: positionaly encoded vector
+    """
 
-#     def __init__(self, hidden_size, sent_len, heads, drop_prob):
-#         """
-#         @param word_embed (int): Word vector size. 
-#         @param sent_len (int): Input sentence size. 
-#         @param heads (int): Number of heads for multihead attention. 
-#         @param drop_prob (float): Probability of zero-ing out activations.
-#         """
-#         super(SelfAttention, self).__init__()
+    def __init__(self, length, hidden_size):
+        super(PositionalEncoder, self).__init__()
 
-#     def forward(self, x):
-#         """
-#         @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
-#         @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
-#         """
-#         return x
+        f = torch.Tensor([10000 ** (-i / hidden_size) if i % 2 == 0 else -10000 **
+                          ((1 - i) / hidden_size) for i in range(hidden_size)]).unsqueeze(dim=1)
+
+        phase = torch.Tensor([0 if i % 2 == 0 else math.pi / 2 for i in range(hidden_size)]).unsqueeze(dim=1)
+        pos = torch.arange(length).repeat(hidden_size, 1).to(torch.float)
+        
+        self.pos_encoding = nn.Parameter(torch.sin(torch.add(torch.mul(pos, f), phase)), requires_grad=False)
+
+    def forward(self, x):
+        return x + self.pos_encoding[0:x.size(1)]
+
+
+
+class SelfAttention(nn.Module):
+    """Self Attention used in Self Attention Block for Encoder Block.
+    Refer to Attention is all you need paper to understand terminology
+    """
+
+    def __init__(self, hidden_size, heads, drop_prob):
+        """
+        @param word_embed (int): Word vector size. 
+        @param sent_len (int): Input sentence size. 
+        @param heads (int): Number of heads for multihead attention. 
+        @param drop_prob (float): Probability of zero-ing out activations.
+        """
+        assert(hidden_size % heads == 0)
+        super(SelfAttention, self).__init__()
+        self.d_model = hidden_size
+        self.h = heads
+        self.d_v = self.d_model//heads
+
+        self.W_q = nn.Linear(in_features=self.d_v, out_features=self.d_v, bias=False)
+        self.W_k = nn.Linear(in_features=self.d_v, out_features=self.d_v, bias=False)
+        self.W_v = nn.Linear(in_features=self.d_v, out_features=self.d_v, bias=False)
+
+        self.linear = nn.Linear(in_features=self.d_model, out_features=self.d_model, bias=False)
+
+    def forward(self, values, keys, query, mask=None):
+        """
+        @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
+        @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
+        """
+        N = query.shape[0]  # batch_size
+        value_len, key_len, query_len = values.shape[2], keys.shape[2], query.shape[2]
+
+        # Split embedding in self.head pieces:
+        values = values.reshape(N, value_len, self.h, self.d_v)
+        keys = keys.reshape(N, key_len, self.h, self.d_v)
+        queries = query.reshape(N, query_len, self.h, self.d_v)
+
+        values = self.W_v(values)
+        keys = self.W_k(keys)
+        queries = self.W_q(queries)
+
+        energy = torch.einsum("nqhd,nkhd->nhqk", [queries, keys])
+        # queries shape: (N, query_len, heads, heads_dim)
+        # keys shape: (N, key_len, heads, heads_dim)
+        # energy shape: (N, heads, query_len, key_len)
+
+        if mask is not None:
+            energy = energy.masked_fill(mask == 0, float("-1e20"))
+
+        attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
+
+        out = torch.einsum("nhql,nlhd->nqhd", [attention, values]).reshape(N, query_len, self.h*self.d_v)
+        # attention shape: (N, heads, query_len, key_len)
+        # values shape: (N, value_len, heads, heads_dim)
+        # after einsum: (N, query_len, heads, head_dim) then flatten last two dimensions
+
+        out = self.linear(out)
+        return out  # (batch_size, sent_len, hidden_size)
 
 
 # ---------------- Helper Residual Blocks ----------------------
@@ -276,17 +363,18 @@ class SelfAttentionBlock(nn.Module):
         super(SelfAttentionBlock, self).__init__()
 
         self.layer_norm = nn.LayerNorm([hidden_size, sent_len])
-        self.att = SelfAttention(hidden_size=hidden_size, sent_len=sent_len, heads=heads, drop_prob=drop_prob)
+        self.self_attn = SelfAttention(hidden_size, heads, drop_prob)
 
     def forward(self, x):
         """
         @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
         @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
         """
-        x_l = self.layer_norm(x)  # (batch_size, hidden_size, sent_len)
-        x = x + self.att(x_l)  # (batch_size, hidden_size, sent_len)
-        return x
+        a = self.layer_norm(x)  # (batch_size, hidden_size, sent_len)
+        att = self.self_attn(a, a, a)
+        att = att.permute(0, 2, 1)  # (batch_size, hidden_size, sent_len)
 
+        return x + att
 
 class FeedForwardBlock(nn.Module):
     """Feed Forward Block used in Encoder Block.
@@ -315,53 +403,32 @@ class FeedForwardBlock(nn.Module):
         return x
 
 
-class SelfAttention(nn.Module):
-    """Self Attention used in Self Attention Block for Encoder Block.
-    """
+# if __name__ == "__main__":
+#     torch.manual_seed(0)
 
-    def __init__(self, hidden_size, sent_len, heads, drop_prob):
-        """
-        @param word_embed (int): Word vector size. 
-        @param sent_len (int): Input sentence size. 
-        @param heads (int): Number of heads for multihead attention. 
-        @param drop_prob (float): Probability of zero-ing out activations.
-        """
-        super(SelfAttention, self).__init__()
+#     x = torch.randn((32, 300, 100))  # (batch_size, word_embed, sent_len)
+#     a = SelfAttention(128, 100, 8, 0.)(x)
+#     print(a.shape)
 
-    def forward(self, x):
-        """
-        @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
-        @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
-        """
-        return x
 
 
 if __name__ == "__main__":
     torch.manual_seed(0)
 
-    x = torch.randn((32, 300, 100))  # (batch_size, word_embed, sent_len)
-    a = SelfAttention(128, 100, 8, 0.)(x)
-    print(a.shape)
-
-
-
-# if __name__ == "__main__":
-#     torch.manual_seed(0)
-
-#     x = torch.randn((32, 300, 100)) # (batch_size, word_embed, sent_len)
+    x = torch.randn((32, 300, 100)) # (batch_size, word_embed, sent_len)
     
-#     x_b = EncoderBlock(conv_layers=4, kernel_size=7, filters=128,
-#                                 heads=8, drop_prob=0, sent_len=100, word_embed=300, hidden_size=128)(x)
-#     x_e = EmbeddingEncoderLayer(conv_layers=4, kernel_size=7, filters=128,
-#                                 heads=8, enc_blocks=9, drop_prob=0, sent_len=100, word_embed=300, hidden_size=128)(x)
-#     x_m = ModelEncoderLayer(conv_layers=2, kernel_size=5, filters=128,
-#                             heads=8, enc_blocks=8, drop_prob=0, sent_len=100, word_embed=128, hidden_size=128)(x_e)
+    x_b = EncoderBlock(conv_layers=4, kernel_size=7, filters=128,
+                                heads=8, drop_prob=0, sent_len=100, word_embed=300, hidden_size=128)(x)
+    x_e = EmbeddingEncoderLayer(conv_layers=4, kernel_size=7, filters=128,
+                                heads=8, enc_blocks=9, drop_prob=0, sent_len=100, word_embed=300, hidden_size=128)(x)
+    x_m = ModelEncoderLayer(conv_layers=2, kernel_size=5, filters=128,
+                            heads=8, enc_blocks=8, drop_prob=0, sent_len=100, word_embed=128, hidden_size=128)(x_e)
     
-#     print(x.shape, x_b.shape, x_e.shape, x_m.shape, sep='\n')
-#     print()
+    print(x.shape, x_b.shape, x_e.shape, x_m.shape, sep='\n')
+    print()
 
-#     smeb_1 = torch.randn((32, 200, 100))
-#     smeb_2 = torch.randn((32, 200, 100))
+    smeb_1 = torch.randn((32, 200, 100))
+    smeb_2 = torch.randn((32, 200, 100))
 
-#     out = OutputLayer(0., 200)
-#     print(out(smeb_1, smeb_2).shape)
+    out = OutputLayer(0., 200)
+    print(out(smeb_1, smeb_2).shape)

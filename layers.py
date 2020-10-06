@@ -72,7 +72,7 @@ class CQAttentionLayer(nn.Module):
         a = torch.bmm(s1, query)
         l = torch.bmm(s1, s2.transpose(1, 2))
         b = torch.bmm(l, context)
-        output = torch.cat((context, a, context*a, context*b), dim=2) # XXX concat over hidden_state only
+        output = torch.cat((context, a, context*a, context*b), dim=2)
         return nn.functional.dropout(output, p=self.dropout).permute(0,2,1)
 
 
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     end = OutputLayer(128)
 
     ans = cqa(enc(c),encq(q))
-    ans = cq_conv(ans) # XXX this makes the dimensions right
+    ans = cq_conv(ans) # this makes the dimensions right
     ans1 = modenc(ans)
     ans2 = modenc(ans1)
     ans3 = modenc(ans2)

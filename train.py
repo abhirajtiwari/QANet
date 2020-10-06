@@ -46,7 +46,7 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = QANet(word_vectors=word_vectors,hidden_state=args.hidden_size, d_model=300, c_len=400, q_len=50, heads=3, log_softmax=True) # FIXME c_len, q_len can make it dynamic  
+    model = QANet(word_vectors=word_vectors,hidden_state=args.hidden_size, d_model=300, c_len=400, q_len=50, heads=3, log_softmax=True)
     # model = BiDAF(word_vectors=word_vectors,
     #               hidden_size=args.hidden_size,
     #               drop_prob=args.drop_prob)

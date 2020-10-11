@@ -2,8 +2,6 @@ import torch
 from layers import *
 from util import torch_from_json
 
-# FIXME add padding to the input sentence
-
 class QANet(nn.Module):
     """QANet model for SQuAD 2.0
     Based on the paper:

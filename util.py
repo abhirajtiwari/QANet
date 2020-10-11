@@ -107,9 +107,13 @@ def collate_fn(examples):
     def merge_0d(scalars, dtype=torch.int64):
         return torch.tensor(scalars, dtype=dtype)
 
-    def merge_1d(arrays, dtype=torch.int64, pad_value=0):
+    def merge_1d(arrays, dtype=torch.int64, pad_value=0, merge='c'):
         lengths = [(a != pad_value).sum() for a in arrays]
-        padded = torch.zeros(len(arrays), max(lengths), dtype=dtype)
+        if merge == 'c':
+            length = 400
+        else:
+            length = 50
+        padded = torch.zeros(len(arrays), length, dtype=dtype)
         for i, seq in enumerate(arrays):
             end = lengths[i]
             padded[i, :end] = seq[:end]
@@ -130,9 +134,9 @@ def collate_fn(examples):
         y1s, y2s, ids = zip(*examples)
 
     # Merge into batch tensors
-    context_idxs = merge_1d(context_idxs)
+    context_idxs = merge_1d(context_idxs, merge='c')
     context_char_idxs = merge_2d(context_char_idxs)
-    question_idxs = merge_1d(question_idxs)
+    question_idxs = merge_1d(question_idxs, merge='q')
     question_char_idxs = merge_2d(question_char_idxs)
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)

@@ -107,10 +107,10 @@ def collate_fn(examples):
     def merge_0d(scalars, dtype=torch.int64):
         return torch.tensor(scalars, dtype=dtype)
 
-    def merge_1d(arrays, dtype=torch.int64, pad_value=0, merge='c'):
+    def merge_1d(arrays, dtype=torch.int64, pad_value=0, merge='c'): 
         lengths = [(a != pad_value).sum() for a in arrays]
         if merge == 'c':
-            length = 400
+            length = 400 # TODO get this number from the args.py
         else:
             length = 50
         padded = torch.zeros(len(arrays), length, dtype=dtype)

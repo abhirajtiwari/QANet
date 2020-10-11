@@ -87,8 +87,8 @@ class ModelEncoderLayer(nn.Module):
         super(ModelEncoderLayer, self).__init__()
 
         self.model_enc = nn.ModuleList([
-            EncoderBlock(d_model, sent_len, conv_layer=conv_layer, heads=heads),
-            *(EncoderBlock(d_model, sent_len, conv_layer=conv_layer, heads=heads)
+            EncoderBlock(d_model, sent_len, filters=d_model, conv_layer=conv_layer, heads=heads),
+            *(EncoderBlock(d_model, sent_len, filters=d_model, conv_layer=conv_layer, heads=heads)
             for _ in range(enc_blocks-1))
         ])
 

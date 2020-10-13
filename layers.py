@@ -62,20 +62,20 @@ class EmbeddingEncoderLayer(nn.Module):
               for _ in range(enc_blocks-1))
         ])
 
-    def forward(self, x):
+    def forward(self, x, mask):
         """Encodes the word embeddings.
         @param x (torch.Tensor): Word embeddings. (batch_size, word_embed, sent_len)
         @returns x (torch.Tensor): Encoded Word embeddings. (batch_size, hidden_size, sent_len)
         """
         for layer in self.emb_enc:
-            x = layer(x)  # (batch_size, hidden_size, sent_len)
+            x = layer(x, mask)  # (batch_size, hidden_size, sent_len)
         return x  # (batch_size, hidden_size, sent_len)
 
 
 class CQAttentionLayer(nn.Module):
     """Context Query Attention Layer.
     Takes 2 inputs: Context Encoded Embedding and Question Encoded Embedding. 
-    Understood and Influenced from https://github.com/tailerr/QANet-pytorch/
+    Understood and Influenced from: https://github.com/tailerr/QANet-pytorch/
     """
     def __init__(self, hidden_size, drop_prob=0.1):
         """
@@ -151,13 +151,13 @@ class ModelEncoderLayer(nn.Module):
             for _ in range(enc_blocks-1))
         ])
 
-    def forward(self, x):
+    def forward(self, x, mask):
         """Encodes the word vectors.
         @param x (torch.Tensor): Input word vectors from CQAttention. (batch_size, , sent_len)
         @returns x (torch.Tensor): Encoded Word Vectors. (batch_size, hidden_size, sent_len)
         """
         for layer in self.model_enc:
-            x = layer(x)  # (batch_size, hidden_size, sent_len)
+            x = layer(x, mask)  # (batch_size, hidden_size, sent_len)
         return x
 
 
@@ -215,7 +215,7 @@ class EncoderBlock(nn.Module):
         self.att = SelfAttentionBlock(hidden_size=hidden_size, sent_len=sent_len, heads=heads, drop_prob=drop_prob)
         self.ff = FeedForwardBlock(hidden_size=hidden_size, sent_len=sent_len)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         """Encodes the word vectors.
         @param x (torch.Tensor): Word vectors. (batch_size, word_embed, sent_len)
         @returns x (torch.Tensor): Encoded Word embeddings. (batch_size, hidden_size, sent_len)
@@ -223,7 +223,7 @@ class EncoderBlock(nn.Module):
         x = self.pos_enc(x)  # (batch_size, hidden_size, sent_len)
         for layer in self.conv:
             x = layer(x)  # (batch_size, hidden_size, sent_len)
-        x = self.att(x)  # (batch_size, hidden_size, sent_len)
+        x = self.att(x, mask)  # (batch_size, hidden_size, sent_len)
         x = self.ff(x)  # (batch_size, hidden_size, sent_len)
         return x
 
@@ -300,6 +300,11 @@ class SelfAttention(nn.Module):
         # energy shape: (N, heads, query_len, key_len)
 
         if mask is not None:
+            print("__"*80)
+            print(energy.shape)
+            print(mask.shape)
+            # print(mask)
+            print("__"*80)
             energy = energy.masked_fill(mask == 0, float("-1e20"))
 
         attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
@@ -368,13 +373,13 @@ class SelfAttentionBlock(nn.Module):
         self.layer_norm = nn.LayerNorm([hidden_size, sent_len])
         self.self_attn = SelfAttention(hidden_size, heads, drop_prob)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         """
         @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
         @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
         """
         a = self.layer_norm(x)  # (batch_size, hidden_size, sent_len)
-        att = self.self_attn(a, a, a)
+        att = self.self_attn(a, a, a, mask=mask)
         att = att.permute(0, 2, 1)  # (batch_size, hidden_size, sent_len)
 
         return x + att

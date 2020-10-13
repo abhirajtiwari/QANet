@@ -95,15 +95,15 @@ class QANet(nn.Module):
         c_emb = self.c_emb(cw_idxs)  # (batch_size, word_embed, c_len)
         q_emb = self.q_emb(qw_idxs)  # (batch_size, word_embed, q_len)
 
-        c_emb_enc = self.c_emb_enc(c_emb)  # (batch_size, hidden_size, c_len)
-        q_emb_enc  = self.q_emb_enc(q_emb)  # (batch_size, hidden_size, q_len)
+        c_emb_enc = self.c_emb_enc(c_emb, c_mask)  # (batch_size, hidden_size, c_len)
+        q_emb_enc  = self.q_emb_enc(q_emb, q_mask)  # (batch_size, hidden_size, q_len)
 
-        qc_att = self.qc_att(c_emb_enc, q_emb_enc)  # (batch_size, 4*hidden_size, c_len)
+        qc_att = self.qc_att(c_emb_enc, q_emb_enc)  # (batch_size, 4*hidden_size, c_len) # ! Add c_mask, q_mask here
         qc_conv = self.qc_conv(qc_att)  # (batch_size, hidden_size, c_len)
 
-        mod_enc_1 = self.mod_enc(qc_conv)  # (batch_size, hidden_size, c_len)
-        mod_enc_2 = self.mod_enc(mod_enc_1)  # (batch_size, hidden_size, c_len)
-        mod_enc_3 = self.mod_enc(mod_enc_2)  # (batch_size, hidden_size, c_len)
+        mod_enc_1 = self.mod_enc(qc_conv, c_mask)  # (batch_size, hidden_size, c_len)
+        mod_enc_2 = self.mod_enc(mod_enc_1, c_mask)  # (batch_size, hidden_size, c_len)
+        mod_enc_3 = self.mod_enc(mod_enc_2, c_mask)  # (batch_size, hidden_size, c_len)
 
 
         start_out = self.start_out(mod_enc_1, mod_enc_2, c_mask)  # (batch_size, c_len)

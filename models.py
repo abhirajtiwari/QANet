@@ -76,7 +76,7 @@ class QANet(nn.Module):
         self.start_out = layers.OutputLayer(drop_prob=drop_prob, word_embed=hidden_size) 
         self.end_out = layers.OutputLayer(drop_prob=drop_prob, word_embed=hidden_size)  
 
-    def forward(self, context, question):
+    def forward(self, cw_idxs, qw_idxs):
         """ Take a mini-batch of context and question sentences, compute the log-likelihood of each 
         position in the context being the start or end of an answer span. 
         
@@ -88,8 +88,12 @@ class QANet(nn.Module):
         @returns start_out (Tensor): Start probability distribution.
         @returns end_out (Tensor): End probability distribution.
         """
-        c_emb = self.c_emb(context)  # (batch_size, word_embed, c_len)
-        q_emb = self.q_emb(question)  # (batch_size, word_embed, q_len)
+        c_mask = torch.zeros_like(cw_idxs) != cw_idxs  # (batch_size, c_len)
+        q_mask = torch.zeros_like(qw_idxs) != qw_idxs  # (batch_size, q_len)   
+        # c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
+
+        c_emb = self.c_emb(cw_idxs)  # (batch_size, word_embed, c_len)
+        q_emb = self.q_emb(qw_idxs)  # (batch_size, word_embed, q_len)
 
         c_emb_enc = self.c_emb_enc(c_emb)  # (batch_size, hidden_size, c_len)
         q_emb_enc  = self.q_emb_enc(q_emb)  # (batch_size, hidden_size, q_len)

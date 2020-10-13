@@ -8,3 +8,4 @@ __pycache__
 !data/dev-v2.0.json
 !data/train-v2.0.json
 !data/test-v2.0.json
+squad.code-workspace

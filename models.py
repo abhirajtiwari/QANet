@@ -106,8 +106,8 @@ class QANet(nn.Module):
         mod_enc_3 = self.mod_enc(mod_enc_2)  # (batch_size, hidden_size, c_len)
 
 
-        start_out = self.start_out(mod_enc_1, mod_enc_2)  # (batch_size, c_len)
-        end_out = self.end_out(mod_enc_1, mod_enc_3)  # (batch_size, c_len)
+        start_out = self.start_out(mod_enc_1, mod_enc_2, c_mask)  # (batch_size, c_len)
+        end_out = self.end_out(mod_enc_1, mod_enc_3, c_mask)  # (batch_size, c_len)
 
         return start_out, end_out
 

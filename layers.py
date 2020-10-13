@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from util import masked_softmax
 
 # --------------- Model Layers ------------------
 class InputEmbeddingLayer(nn.Module):
@@ -171,9 +172,8 @@ class OutputLayer(nn.Module):
         """
         super(OutputLayer, self).__init__()
         self.ff = nn.Linear(2*word_embed, 1)
-        self.soft = nn.Softmax(dim=2)
 
-    def forward(self, input_1, input_2):
+    def forward(self, input_1, input_2, mask):
         """Encodes the word embeddings.
         @param input_1 (torch.Tensor): Word vectors from first Model Encoder Layer. (batch_size, hidden_size, sent_len)
         @param input_2 (torch.Tensor): Word vectors from second Model Encoder Layer. (batch_size, hidden_size, sent_len)
@@ -181,8 +181,10 @@ class OutputLayer(nn.Module):
         """
         x = torch.cat((input_1, input_2), dim=1)  # (batch_size, 2*hidden_size, sent_len)
         x = self.ff(x.permute(0, 2, 1)).permute(0, 2, 1)  # (batch_size, 1, sent_len)
-        p = self.soft(x)  # (batch_size, 1, sent_len)
-        return p.squeeze()  # (batch_size, sent_len)
+        # Shapes: (batch_size, sent_len)
+        logits = x.squeeze()
+        log_p = masked_softmax(logits, mask, log_softmax=True) 
+        return log_p  
 
 
 # ---------------- Helper Layers ----------------------

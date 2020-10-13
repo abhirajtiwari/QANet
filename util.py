@@ -116,6 +116,7 @@ def collate_fn(examples):
         padded = torch.zeros(len(arrays), length, dtype=dtype)
         for i, seq in enumerate(arrays):
             end = lengths[i]
+            end = np.min([400, end]) # Because there is a null token added while creating dataset its len can become 401 so drop last word
             padded[i, :end] = seq[:end]
         return padded
 

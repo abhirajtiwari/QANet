@@ -91,6 +91,8 @@ class QANet(nn.Module):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs  # (batch_size, c_len)
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs  # (batch_size, q_len)   
         # c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
+        c_mask = c_mask.unsqueeze(1).unsqueeze(2)  # (batch_size, 1, 1, c_len)
+        q_mask = q_mask.unsqueeze(1).unsqueeze(2)  # (batch_size, 1, 1, q_len)
 
         c_emb = self.c_emb(cw_idxs)  # (batch_size, word_embed, c_len)
         q_emb = self.q_emb(qw_idxs)  # (batch_size, word_embed, q_len)
@@ -126,5 +128,6 @@ if __name__ == "__main__":
     r = qanet(context, question)[0]
     
     print("Final score shape:")
-    print(r.shape)
+    print(r.shape)  # (batch_size, sent_len) (2, 20)
     # print(r)
+    # after mask: (2, 1, 2, 200)

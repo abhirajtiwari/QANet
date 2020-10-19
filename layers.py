@@ -183,7 +183,9 @@ class OutputLayer(nn.Module):
         x = self.ff(x.permute(0, 2, 1)).permute(0, 2, 1)  # (batch_size, 1, sent_len)
         # Shapes: (batch_size, sent_len)
         logits = x.squeeze()
-        log_p = masked_softmax(logits, mask, log_softmax=True) 
+        print("logits: ", logits.shape)  # (2, 200)
+        log_p = masked_softmax(logits, mask, log_softmax=True)  #TODO this implementation is for both start_p, end_p : FIXME
+        print("log_p: ", log_p.shape)  # (2, 1, 2, 200)
         return log_p  
 
 
@@ -265,6 +267,7 @@ class SelfAttention(nn.Module):
         @param heads (int): Number of heads for multihead attention. 
         @param drop_prob (float): Probability of zero-ing out activations.
         """
+        print(hidden_size, heads)
         assert(hidden_size % heads == 0)
         super(SelfAttention, self).__init__()
         self.d_model = hidden_size
@@ -285,6 +288,17 @@ class SelfAttention(nn.Module):
         N = query.shape[0]  # batch_size
         value_len, key_len, query_len = values.shape[2], keys.shape[2], query.shape[2]
 
+        # print(values.shape)
+        values = values.permute(0, 2, 1)
+        keys = keys.permute(0, 2, 1)
+        query = query.permute(0, 2, 1)
+
+        # print("__"*80)
+        # print("__"*80)
+        # print(values.shape)
+        # print("__"*80)
+        # print("__"*80)
+
         # Split embedding in self.head pieces:
         values = values.reshape(N, value_len, self.h, self.d_v)
         keys = keys.reshape(N, key_len, self.h, self.d_v)
@@ -301,11 +315,13 @@ class SelfAttention(nn.Module):
 
         if mask is not None:
             print("__"*80)
+            print("energy")
             print(energy.shape)
+            print("mask")
             print(mask.shape)
             # print(mask)
             print("__"*80)
-            energy = energy.masked_fill(mask == 0, float("-1e20"))
+            # energy = energy.masked_fill(mask == 0, float("-1e20"))
 
         attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
 

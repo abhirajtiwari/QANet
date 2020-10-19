@@ -90,11 +90,16 @@ class CQAttentionLayer(nn.Module):
         self.w = nn.Parameter(w)
         self.drop_prob = drop_prob
 
-    def forward(self, context, question):
+    def forward(self, context, question, c_mask, q_mask):
         """
         @param context (torch.Tensor): Encoded context embedding. (batch_size, hidden_size, c_len)
         @param question (torch.Tensor): Encoded question embedding. (batch_size, hidden_size, q_len)
         """
+        if len(c_mask.shape) != 4:
+            c_mask = c_mask.unsqueeze(1) # (batch_size, 1, c_len)
+        if len(q_mask.shape) != 4:
+            q_mask = q_mask.unsqueeze(1)  # (batch_size, 1, q_len)
+
         context = context.permute(0, 2, 1)  # (batch_size, c_len, hidden_size)
         query = question.permute(0, 2, 1)  # (batch_size, q_len, hidden_size)
 
@@ -113,6 +118,10 @@ class CQAttentionLayer(nn.Module):
         # s = torch.matmul(torch.cat((q, c, cq), 3), self.w).transpose(1, 2)
         s = (torch.cat((q, c, cq), dim=3) @ self.w).transpose(1, 2)
         # (batch_size, q_len, c_len, 3*hidden_size) --> (batch_size, q_len, c_len) --> (batch_size, c_len, q_len)
+
+        if q_mask is not None:
+            s = s.masked_fill(q_mask == 0, float("-1e20"))  #TODO add a mask here.
+        #? how to use 2 masks
 
         s1 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
         s2 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
@@ -184,7 +193,7 @@ class OutputLayer(nn.Module):
         # Shapes: (batch_size, sent_len)
         logits = x.squeeze()
         print("logits: ", logits.shape)  # (2, 200)
-        log_p = masked_softmax(logits, mask, log_softmax=True)  #TODO this implementation is for both start_p, end_p : FIXME
+        log_p = masked_softmax(logits, mask, log_softmax=True)
         print("log_p: ", log_p.shape)  # (2, 1, 2, 200)
         return log_p  
 
@@ -285,6 +294,8 @@ class SelfAttention(nn.Module):
         @param x (torch.Tensor): Word vectors. (batch_size, hidden_size, sent_len)
         @returns x (torch.Tensor): Word vectors with self attention. (batch_size, hidden_size, sent_len)
         """
+        if len(mask.shape) != 4:
+            mask = mask.unsqueeze(1).unsqueeze(2) # (batch_size, 1, 1, sent_len)
         N = query.shape[0]  # batch_size
         value_len, key_len, query_len = values.shape[2], keys.shape[2], query.shape[2]
 
@@ -321,7 +332,7 @@ class SelfAttention(nn.Module):
             print(mask.shape)
             # print(mask)
             print("__"*80)
-            # energy = energy.masked_fill(mask == 0, float("-1e20"))
+            energy = energy.masked_fill(mask == 0, float("-1e20"))
 
         attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
 

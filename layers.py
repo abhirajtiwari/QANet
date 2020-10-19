@@ -192,9 +192,9 @@ class OutputLayer(nn.Module):
         x = self.ff(x.permute(0, 2, 1)).permute(0, 2, 1)  # (batch_size, 1, sent_len)
         # Shapes: (batch_size, sent_len)
         logits = x.squeeze()
-        print("logits: ", logits.shape)  # (2, 200)
+        # print("logits: ", logits.shape)  # (2, 200)
         log_p = masked_softmax(logits, mask, log_softmax=True)
-        print("log_p: ", log_p.shape)  # (2, 1, 2, 200)
+        # print("log_p: ", log_p.shape)  # (2, 1, 2, 200)
         return log_p  
 
 
@@ -214,6 +214,8 @@ class EncoderBlock(nn.Module):
         @param hidden_size (int): Number of features in the hidden state at each layer.
         """
         super(EncoderBlock, self).__init__()
+        # print("SENT_LEN: ", sent_len)
+        # print("WORD_EMBED: ", word_embed)
 
         self.pos_enc = PositionalEncoder(sent_len, word_embed)
         self.conv = nn.ModuleList([
@@ -260,6 +262,10 @@ class PositionalEncoder(nn.Module):
         self.pos_encoding = nn.Parameter(torch.sin(torch.add(torch.mul(pos, f), phase)), requires_grad=False)
 
     def forward(self, x):
+        # print("__"*80)
+        # print(x.shape)
+        # print((self.pos_encoding[0:x.size(1)]).shape)
+        # print("__"*80)
         return x + self.pos_encoding[0:x.size(1)]
 
 
@@ -276,7 +282,7 @@ class SelfAttention(nn.Module):
         @param heads (int): Number of heads for multihead attention. 
         @param drop_prob (float): Probability of zero-ing out activations.
         """
-        print(hidden_size, heads)
+        # print(hidden_size, heads)
         assert(hidden_size % heads == 0)
         super(SelfAttention, self).__init__()
         self.d_model = hidden_size
@@ -310,6 +316,7 @@ class SelfAttention(nn.Module):
         # print("__"*80)
         # print("__"*80)
 
+        #TODO the order is supposed to be linear -> split
         # Split embedding in self.head pieces:
         values = values.reshape(N, value_len, self.h, self.d_v)
         keys = keys.reshape(N, key_len, self.h, self.d_v)
@@ -325,13 +332,13 @@ class SelfAttention(nn.Module):
         # energy shape: (N, heads, query_len, key_len)
 
         if mask is not None:
-            print("__"*80)
-            print("energy")
-            print(energy.shape)
-            print("mask")
-            print(mask.shape)
+            # print("__"*80)
+            # print("energy")
+            # print(energy.shape)
+            # print("mask")
+            # print(mask.shape)
             # print(mask)
-            print("__"*80)
+            # print("__"*80)
             energy = energy.masked_fill(mask == 0, float("-1e20"))
 
         attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)

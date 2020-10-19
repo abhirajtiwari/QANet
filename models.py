@@ -25,7 +25,7 @@ class QANet(nn.Module):
         - Model Encoder Layer: Encode the sequence again.
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
-    def __init__(self, word_vectors, hidden_size=128, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8):
+    def __init__(self, word_vectors, hidden_size=1, drop_prob=0., c_len=400, q_len=50, word_embed=300, heads=1):
         """Init QANET Model.
         
         @param word_vectors (torch.Tensor): Pre-trained word vectors.
@@ -91,44 +91,51 @@ class QANet(nn.Module):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs  # (batch_size, c_len)
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs  # (batch_size, q_len)   
         # c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
-
+        # print("__"*80)
+        # print("__"*80)
+        # print("C_EMB, Q_EMB")
         c_emb = self.c_emb(cw_idxs)  # (batch_size, word_embed, c_len)
         q_emb = self.q_emb(qw_idxs)  # (batch_size, word_embed, q_len)
-
+        # print("__"*80)
+        # print("C_EMB_ENC, Q_EMB_ENC")
+        # print("c_emb shape: ", c_emb.shape)
+        # print("c mask shape: ", c_mask.shape)
         c_emb_enc = self.c_emb_enc(c_emb, c_mask)  # (batch_size, hidden_size, c_len)
         q_emb_enc  = self.q_emb_enc(q_emb, q_mask)  # (batch_size, hidden_size, q_len)
-
+        # print("__"*80)
+        # print("CQAttention")
         qc_att = self.qc_att(c_emb_enc, q_emb_enc, c_mask, q_mask)  # (batch_size, 4*hidden_size, c_len) # ! Add c_mask, q_mask here
         qc_conv = self.qc_conv(qc_att)  # (batch_size, hidden_size, c_len)
-
+        # print("__"*80)
+        # print("MOD_ENC")
         mod_enc_1 = self.mod_enc(qc_conv, c_mask)  # (batch_size, hidden_size, c_len)
         mod_enc_2 = self.mod_enc(mod_enc_1, c_mask)  # (batch_size, hidden_size, c_len)
         mod_enc_3 = self.mod_enc(mod_enc_2, c_mask)  # (batch_size, hidden_size, c_len)
-
-
+        # print("__"*80)
+        # print("OUTPUT")
         start_out = self.start_out(mod_enc_1, mod_enc_2, c_mask)  # (batch_size, c_len)
         end_out = self.end_out(mod_enc_1, mod_enc_3, c_mask)  # (batch_size, c_len)
-
+        # print("__"*80)
+        # print("__"*80)
         return start_out, end_out
-
 
 if __name__ == "__main__":
     torch.manual_seed(0)
     
-    word_vec = torch_from_json("./data/word_emb.json")
-    # word_vec = torch.randn(2, 3)
-    context = torch.rand((2, 200)).to(torch.int64)
-    question = torch.rand((2, 100)).to(torch.int64)
-    # answer = torch.randn((32, 300, 150))  # part of context
+    # word_vec = torch_from_json("./data/word_emb.json")
+    # # word_vec = torch.randn(2, 3)
+    # context = torch.rand((2, 200)).to(torch.int64)
+    # question = torch.rand((2, 100)).to(torch.int64)
+    # # answer = torch.randn((32, 300, 150))  # part of context
 
 
-    qanet = QANet(word_vec, hidden_size=8, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8)
-    r = qanet(context, question)[0]
+    # qanet = QANet(word_vec, hidden_size=8, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8)
+    # r = qanet(context, question)[0]
     
-    print("Final score shape:")
-    print(r.shape)  # (batch_size, sent_len) (2, 20)
+    # print("Final score shape:")
+    # print(r.shape)  # (batch_size, sent_len) (2, 20)
     # print(r)
-    
+
 
     #################################################################################
     ### decoder masks from transformers checking
@@ -225,16 +232,18 @@ if __name__ == "__main__":
     ### self attention masks
     #################################################################################
 
-    # cw_idxs = torch.tensor(
-    #     [
-    #         [3, 9, 5, 2, 0],
-    #         [4, 5, 6, 0, 0]
-    #     ]
-    # ).float()
-    # c_mask = torch.zeros_like(cw_idxs) != cw_idxs
-    # cw_idxs = cw_idxs.unsqueeze(1) 
-    # print(cw_idxs.shape, c_mask.shape)
+    cw_idxs = torch.tensor(
+        [
+            [3, 9, 5, 2, 0],
+            [4, 5, 6, 0, 0]
+        ]
+    ).float()
+    c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+    cw_idxs = cw_idxs.unsqueeze(1) 
+    print(cw_idxs.shape, c_mask.shape)
     # layer = layers.SelfAttention(hidden_size=1, heads=1, drop_prob=0.)
+    layer = MultiHeadedAttention(h=1, d_model=1)
+    print(layer(cw_idxs, cw_idxs, cw_idxs))
 
 
     # print(layer(cw_idxs, cw_idxs, cw_idxs, c_mask))  # print energy, attention, out

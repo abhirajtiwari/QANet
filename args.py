@@ -15,7 +15,7 @@ def get_setup_args():
 
     parser.add_argument('--train_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/data/train-v2.0_1.json')
+                        default='https://github.com/chrischute/squad/data/train-v2.0.json')
     parser.add_argument('--dev_url',
                         type=str,
                         default='https://github.com/chrischute/squad/data/dev-v2.0.json')
@@ -107,7 +107,7 @@ def get_train_args():
                         help='L2 weight decay.')
     parser.add_argument('--num_epochs',
                         type=int,
-                        default=30,
+                        default=300,
                         help='Number of epochs for which to train. Negative means forever.')
     parser.add_argument('--drop_prob',
                         type=float,
@@ -223,7 +223,7 @@ def add_train_test_args(parser):
                         help='Base directory for saving information.')
     parser.add_argument('--batch_size',
                         type=int,
-                        default=64,
+                        default=4,
                         help='Batch size per GPU. Scales automatically when \
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',

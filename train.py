@@ -99,64 +99,65 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids = next(iter(train_loader))
+            # for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 # Setup for forward
-                cw_idxs = cw_idxs.to(device)
-                qw_idxs = qw_idxs.to(device)
-                batch_size = cw_idxs.size(0)
-                optimizer.zero_grad()
+            cw_idxs = cw_idxs.to(device)
+            qw_idxs = qw_idxs.to(device)
+            batch_size = cw_idxs.size(0)
+            optimizer.zero_grad()
 
-                # Forward
-                log_p1, log_p2 = model(cw_idxs, qw_idxs)
-                y1, y2 = y1.to(device), y2.to(device)
-                loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
-                loss_val = loss.item()
+            # Forward
+            log_p1, log_p2 = model(cw_idxs, qw_idxs)
+            y1, y2 = y1.to(device), y2.to(device)
+            loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+            loss_val = loss.item()
 
-                # Backward
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                optimizer.step()
-                scheduler.step(step // batch_size)
-                ema(model, step // batch_size)
+            # Backward
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+            optimizer.step()
+            scheduler.step(step // batch_size)
+            ema(model, step // batch_size)
 
-                # Log info
-                step += batch_size
-                progress_bar.update(batch_size)
-                progress_bar.set_postfix(epoch=epoch,
-                                         NLL=loss_val)
-                tbx.add_scalar('train/NLL', loss_val, step)
-                tbx.add_scalar('train/LR',
-                               optimizer.param_groups[0]['lr'],
-                               step)
+            # Log info
+            step += batch_size
+            progress_bar.update(batch_size)
+            progress_bar.set_postfix(epoch=epoch,
+                                        NLL=loss_val)
+            tbx.add_scalar('train/NLL', loss_val, step)
+            tbx.add_scalar('train/LR',
+                            optimizer.param_groups[0]['lr'],
+                            step)
 
-                steps_till_eval -= batch_size
-                if steps_till_eval <= 0:
-                    steps_till_eval = args.eval_steps
+            steps_till_eval -= batch_size
+            if steps_till_eval <= 0:
+                steps_till_eval = args.eval_steps
 
-                    # Evaluate and save checkpoint
-                    log.info(f'Evaluating at step {step}...')
-                    ema.assign(model)
-                    results, pred_dict = evaluate(model, dev_loader, device,
-                                                  args.dev_eval_file,
-                                                  args.max_ans_len,
-                                                  args.use_squad_v2)
-                    saver.save(step, model, results[args.metric_name], device)
-                    ema.resume(model)
+                # Evaluate and save checkpoint
+                log.info(f'Evaluating at step {step}...')
+                ema.assign(model)
+                results, pred_dict = evaluate(model, dev_loader, device,
+                                                args.dev_eval_file,
+                                                args.max_ans_len,
+                                                args.use_squad_v2)
+                saver.save(step, model, results[args.metric_name], device)
+                ema.resume(model)
 
-                    # Log to console
-                    results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in results.items())
-                    log.info(f'Dev {results_str}')
+                # Log to console
+                results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in results.items())
+                log.info(f'Dev {results_str}')
 
-                    # Log to TensorBoard
-                    log.info('Visualizing in TensorBoard...')
-                    for k, v in results.items():
-                        tbx.add_scalar(f'dev/{k}', v, step)
-                    util.visualize(tbx,
-                                   pred_dict=pred_dict,
-                                   eval_path=args.dev_eval_file,
-                                   step=step,
-                                   split='dev',
-                                   num_visuals=args.num_visuals)
+                # Log to TensorBoard
+                log.info('Visualizing in TensorBoard...')
+                for k, v in results.items():
+                    tbx.add_scalar(f'dev/{k}', v, step)
+                util.visualize(tbx,
+                                pred_dict=pred_dict,
+                                eval_path=args.dev_eval_file,
+                                step=step,
+                                split='dev',
+                                num_visuals=args.num_visuals)
 
 
 def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):

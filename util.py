@@ -41,14 +41,17 @@ class SQuAD(data.Dataset):
         data_path (str): Path to .npz file containing pre-processed dataset.
         use_v2 (bool): Whether to use SQuAD 2.0 questions. Otherwise only use SQuAD 1.1.
     """
+
     def __init__(self, data_path, use_v2=True):
         super(SQuAD, self).__init__()
 
         dataset = np.load(data_path)
         self.context_idxs = torch.from_numpy(dataset['context_idxs']).long()
-        self.context_char_idxs = torch.from_numpy(dataset['context_char_idxs']).long()
+        self.context_char_idxs = torch.from_numpy(
+            dataset['context_char_idxs']).long()
         self.question_idxs = torch.from_numpy(dataset['ques_idxs']).long()
-        self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
+        self.question_char_idxs = torch.from_numpy(
+            dataset['ques_char_idxs']).long()
         self.y1s = torch.from_numpy(dataset['y1s']).long()
         self.y2s = torch.from_numpy(dataset['y2s']).long()
 
@@ -60,8 +63,10 @@ class SQuAD(data.Dataset):
             self.question_idxs = torch.cat((ones, self.question_idxs), dim=1)
 
             ones = torch.ones((batch_size, 1, w_len), dtype=torch.int64)
-            self.context_char_idxs = torch.cat((ones, self.context_char_idxs), dim=1)
-            self.question_char_idxs = torch.cat((ones, self.question_char_idxs), dim=1)
+            self.context_char_idxs = torch.cat(
+                (ones, self.context_char_idxs), dim=1)
+            self.question_char_idxs = torch.cat(
+                (ones, self.question_char_idxs), dim=1)
 
             self.y1s += 1
             self.y2s += 1
@@ -107,18 +112,25 @@ def collate_fn(examples):
     def merge_0d(scalars, dtype=torch.int64):
         return torch.tensor(scalars, dtype=dtype)
 
-    def merge_1d(arrays, dtype=torch.int64, pad_value=0):
+    def merge_1d(arrays, dtype=torch.int64, pad_value=0, merge='c'):
         lengths = [(a != pad_value).sum() for a in arrays]
-        padded = torch.zeros(len(arrays), max(lengths), dtype=dtype)
+        if merge == 'c':
+            length = 400  # TODO get this number from the args.py
+        else:
+            length = 50
+        padded = torch.zeros(len(arrays), length, dtype=dtype)
         for i, seq in enumerate(arrays):
             end = lengths[i]
+            # Because there is a null token added while creating dataset its len can become 401 so drop last word
+            end = np.min([400, end])
             padded[i, :end] = seq[:end]
         return padded
 
     def merge_2d(matrices, dtype=torch.int64, pad_value=0):
         heights = [(m.sum(1) != pad_value).sum() for m in matrices]
         widths = [(m.sum(0) != pad_value).sum() for m in matrices]
-        padded = torch.zeros(len(matrices), max(heights), max(widths), dtype=dtype)
+        padded = torch.zeros(len(matrices), max(
+            heights), max(widths), dtype=dtype)
         for i, seq in enumerate(matrices):
             height, width = heights[i], widths[i]
             padded[i, :height, :width] = seq[:height, :width]
@@ -130,9 +142,9 @@ def collate_fn(examples):
         y1s, y2s, ids = zip(*examples)
 
     # Merge into batch tensors
-    context_idxs = merge_1d(context_idxs)
+    context_idxs = merge_1d(context_idxs, merge='c')
     context_char_idxs = merge_2d(context_char_idxs)
-    question_idxs = merge_1d(question_idxs)
+    question_idxs = merge_1d(question_idxs, merge='q')
     question_char_idxs = merge_2d(question_char_idxs)
     y1s = merge_0d(y1s)
     y2s = merge_0d(y2s)
@@ -149,6 +161,7 @@ class AverageMeter:
     Adapted from:
         > https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
+
     def __init__(self):
         self.avg = 0
         self.sum = 0
@@ -177,6 +190,7 @@ class EMA:
         model (torch.nn.Module): Model with parameters whose EMA will be kept.
         decay (float): Decay rate for exponential moving average.
     """
+
     def __init__(self, model, decay):
         self.decay = decay
         self.shadow = {}
@@ -237,6 +251,7 @@ class CheckpointSaver:
             minimizes the metric.
         log (logging.Logger): Optional logger for printing information.
     """
+
     def __init__(self, save_dir, max_checkpoints, metric_name,
                  maximize_metric=False, log=None):
         super(CheckpointSaver, self).__init__()
@@ -248,7 +263,8 @@ class CheckpointSaver:
         self.best_val = None
         self.ckpt_paths = queue.PriorityQueue()
         self.log = log
-        self._print(f"Saver will {'max' if maximize_metric else 'min'}imize {metric_name}...")
+        self._print(
+            f"Saver will {'max' if maximize_metric else 'min'}imize {metric_name}...")
 
     def is_best(self, metric_val):
         """Check whether `metric_val` is the best seen so far.
@@ -402,7 +418,8 @@ def visualize(tbx, pred_dict, eval_path, step, split, num_visuals):
     if num_visuals > len(pred_dict):
         num_visuals = len(pred_dict)
 
-    visual_ids = np.random.choice(list(pred_dict), size=num_visuals, replace=False)
+    visual_ids = np.random.choice(
+        list(pred_dict), size=num_visuals, replace=False)
 
     with open(eval_path, 'r') as eval_file:
         eval_dict = json.load(eval_file)
@@ -491,6 +508,7 @@ def get_logger(log_dir, name):
         See Also:
             > https://stackoverflow.com/questions/38543506
         """
+
         def emit(self, record):
             try:
                 msg = self.format(record)
@@ -658,8 +676,10 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
         total += 1
         ground_truths = gold_dict[key]['answers']
         prediction = value
-        em += metric_max_over_ground_truths(compute_em, prediction, ground_truths)
-        f1 += metric_max_over_ground_truths(compute_f1, prediction, ground_truths)
+        em += metric_max_over_ground_truths(compute_em,
+                                            prediction, ground_truths)
+        f1 += metric_max_over_ground_truths(compute_f1,
+                                            prediction, ground_truths)
         if no_answer:
             avna += compute_avna(prediction, ground_truths)
 

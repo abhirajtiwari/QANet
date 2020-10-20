@@ -50,5 +50,8 @@ Sample output:
 
 '''bash
 python3 trian.py -n baseline_train
+'''
+'''
+bash
 tensorboard --logdir save --port 5678 # Start TensorBoard
 '''

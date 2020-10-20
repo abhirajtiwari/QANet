@@ -25,7 +25,7 @@ class QANet(nn.Module):
         - Model Encoder Layer: Encode the sequence again.
         - Output Layer: Simple layer (e.g., fc + softmax) to get final outputs.   
     """
-    def __init__(self, word_vectors, hidden_size=64, drop_prob=0., c_len=400, q_len=50, word_embed=300, heads=3):
+    def __init__(self, word_vectors, hidden_size=64, drop_prob=0., c_len=400, q_len=50, word_embed=300, heads=4):
         """Init QANET Model.
         
         @param word_vectors (torch.Tensor): Pre-trained word vectors.

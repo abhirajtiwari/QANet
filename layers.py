@@ -95,10 +95,11 @@ class CQAttentionLayer(nn.Module):
         @param context (torch.Tensor): Encoded context embedding. (batch_size, hidden_size, c_len)
         @param question (torch.Tensor): Encoded question embedding. (batch_size, hidden_size, q_len)
         """
-        if len(c_mask.shape) != 4:
-            c_mask = c_mask.unsqueeze(1) # (batch_size, 1, c_len)
         if len(q_mask.shape) != 4:
             q_mask = q_mask.unsqueeze(1)  # (batch_size, 1, q_len)
+        if len(c_mask.shape) != 4:
+            c_mask = c_mask.unsqueeze(2) # (batch_size, c_len, 1) use for masked_softmax
+            # c_mask = c_mask.unsqueeze(1)  # (batch_size, 1, c_len) use for custom mask code
 
         context = context.permute(0, 2, 1)  # (batch_size, c_len, hidden_size)
         query = question.permute(0, 2, 1)  # (batch_size, q_len, hidden_size)
@@ -119,19 +120,24 @@ class CQAttentionLayer(nn.Module):
         s = (torch.cat((q, c, cq), dim=3) @ self.w).transpose(1, 2)
         # (batch_size, q_len, c_len, 3*hidden_size) --> (batch_size, q_len, c_len) --> (batch_size, c_len, q_len)
 
-        if q_mask is not None:
-            s = s.masked_fill(q_mask == 0, float("-1e20"))  #TODO add a mask here.
-        #? how to use 2 masks
+        # if q_mask is not None:
+        #     s = s.masked_fill(q_mask == 0, float("-1e20"))  #TODO add a mask here.
+        # # #? how to use 2 masks
 
-        s1 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
-        s2 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
+        # s1 = nn.functional.softmax(s, dim=2)  # (batch_size, c_len, q_len)
+        # s2 = nn.functional.softmax(s, dim=1)  # (batch_size, c_len, q_len)
+        # print(s.shape, q_mask.shape, c_mask.shape)
+        s1 = masked_softmax(s, q_mask, dim=2)  # (batch_size, c_len, q_len)
+        s2 = masked_softmax(s, c_mask, dim=1)  # (batch_size, c_len, q_len)
 
         a = torch.bmm(s1, query)  # (batch_size, c_len, hidden_size)
         l = torch.bmm(s1, s2.transpose(1, 2))  # (batch_size, c_len, c_len)
         b = torch.bmm(l, context)  # (batch_size, c_len, hidden_size)
         # * concat over hidden_state only
         output = torch.cat((context, a, context*a, context*b), dim=2)  # (batch_size, c_len, 4*hidden_size)
+        # print(output[0])
         return nn.functional.dropout(output, p=self.drop_prob).permute(0, 2, 1)  # (batch_size, 4*hidden_size, c_len)
+        # return s2
 
 
 class ModelEncoderLayer(nn.Module):
@@ -331,7 +337,8 @@ class SelfAttention(nn.Module):
         # keys shape: (N, key_len, heads, heads_dim)
         # energy shape: (N, heads, query_len, key_len)
 
-        if mask is not None:
+        # if mask is not None:
+        #     energy = energy.masked_fill(mask == 0, float("-1e20"))
             # print("__"*80)
             # print("energy")
             # print(energy.shape)
@@ -339,9 +346,9 @@ class SelfAttention(nn.Module):
             # print(mask.shape)
             # print(mask)
             # print("__"*80)
-            energy = energy.masked_fill(mask == 0, float("-1e20"))
 
-        attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
+        # attention = torch.softmax(energy / (self.d_model ** (1/2)), dim=3)
+        attention = masked_softmax(energy / (self.d_model ** (1/2)), mask, dim=3)
 
         out = torch.einsum("nhql,nlhd->nqhd", [attention, values]).reshape(N, query_len, self.h*self.d_v)
         # attention shape: (N, heads, query_len, key_len)
@@ -414,6 +421,7 @@ class SelfAttentionBlock(nn.Module):
         """
         a = self.layer_norm(x)  # (batch_size, hidden_size, sent_len)
         att = self.self_attn(a, a, a, mask=mask)
+        # print(att.shape)
         att = att.permute(0, 2, 1)  # (batch_size, hidden_size, sent_len)
 
         return x + att

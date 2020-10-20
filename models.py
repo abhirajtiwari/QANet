@@ -122,18 +122,18 @@ class QANet(nn.Module):
 if __name__ == "__main__":
     torch.manual_seed(0)
     
-    # word_vec = torch_from_json("./data/word_emb.json")
-    # # word_vec = torch.randn(2, 3)
-    # context = torch.rand((2, 200)).to(torch.int64)
-    # question = torch.rand((2, 100)).to(torch.int64)
-    # # answer = torch.randn((32, 300, 150))  # part of context
+    word_vec = torch_from_json("./data/word_emb.json")
+    # word_vec = torch.randn(2, 3)
+    context = torch.rand((2, 200)).to(torch.int64)
+    question = torch.rand((2, 100)).to(torch.int64)
+    # answer = torch.randn((32, 300, 150))  # part of context
 
 
-    # qanet = QANet(word_vec, hidden_size=8, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8)
-    # r = qanet(context, question)[0]
+    qanet = QANet(word_vec, hidden_size=8, drop_prob=0., c_len=200, q_len=100, word_embed=300, heads=8)
+    r = qanet(context, question)[0]
     
-    # print("Final score shape:")
-    # print(r.shape)  # (batch_size, sent_len) (2, 20)
+    print("Final score shape:")
+    print(r.shape)  # (batch_size, sent_len) (2, 20)
     # print(r)
 
 
@@ -232,18 +232,20 @@ if __name__ == "__main__":
     ### self attention masks
     #################################################################################
 
-    cw_idxs = torch.tensor(
-        [
-            [3, 9, 5, 2, 0],
-            [4, 5, 6, 0, 0]
-        ]
-    ).float()
-    c_mask = torch.zeros_like(cw_idxs) != cw_idxs
-    cw_idxs = cw_idxs.unsqueeze(1) 
-    print(cw_idxs.shape, c_mask.shape)
+    # cw_idxs = torch.tensor(
+    #     [
+    #         [3, 9, 5, 2, 0],
+    #         [4, 5, 6, 0, 0]
+    #     ]
+    # ).float()
+    # c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+    # cw_idxs = cw_idxs.unsqueeze(1) 
+    # print(cw_idxs.shape, c_mask.shape)  # (2, 1, 5), (2, 5)
+    # layer = layers.CQAttentionLayer(hidden_size=1, drop_prob=0.)
+    # print(layer(cw_idxs, cw_idxs, c_mask, c_mask))
+
+
     # layer = layers.SelfAttention(hidden_size=1, heads=1, drop_prob=0.)
-    layer = MultiHeadedAttention(h=1, d_model=1)
-    print(layer(cw_idxs, cw_idxs, cw_idxs))
 
 
     # print(layer(cw_idxs, cw_idxs, cw_idxs, c_mask))  # print energy, attention, out

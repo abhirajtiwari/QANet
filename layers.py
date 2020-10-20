@@ -66,7 +66,7 @@ class CQAttentionLayer(nn.Module):
         q = query.repeat(c_len, 1, 1, 1).permute([1, 2, 0, 3])
         cq = c*q
         s = torch.matmul(torch.cat((q, c, cq), 3), self.w).transpose(1, 2)
-        s1 = nn.functional.softmax(s, 1)
+        s1 = nn.functional.softmax(s, 2)
         s2 = nn.functional.softmax(s, 1)
         
         a = torch.bmm(s1, query)
@@ -143,6 +143,9 @@ class SelfAttention(nn.Module):
         value_len, key_len, query_len = values.shape[2], keys.shape[2], query.shape[2]
 
         # Split embedding in self.head pieces:
+        values = values.premute(0,2,1)
+        keys = keys.premute(0,2,1)
+        query = query.premute(0,2,1)
         values = values.reshape(N, value_len, self.h, self.d_v)
         keys = keys.reshape(N, key_len, self.h, self.d_v)
         queries = query.reshape(N, query_len, self.h, self.d_v)

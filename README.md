@@ -8,7 +8,7 @@ python3 evaluate-v2.0.py <path_to_dev-v2.0> <path_to_predictions>
 
 Sample input:
 ```bash
-python3 evaluate-v2.0.py dev-v2.0.json dev-evaluate-v2.0-in1.txt
+python3 evaluate-v2.0.py data/dev-v2.0.json dev-evaluate-v2.0-in1.txt
 ```
 
 Sample output:
@@ -55,4 +55,6 @@ To train and open Tensorboard:
 python3 trian.py -n baseline_train
 
 tensorboard --logdir save --port 5678 # Start TensorBoard
+
+python3 test.py -n test --load_path ./save/train/18-05-01/step_50000.pth.tar  #  For submission to leaderboard
 ```

@@ -58,3 +58,8 @@ tensorboard --logdir save --port 5678 # Start TensorBoard
 
 python3 test.py -n test --load_path ./save/train/18-05-01/step_50000.pth.tar  #  For submission to leaderboard
 ```
+Check on the following:
+- --batch_size : default 64 (try 4)
+- --num_workers : default 4 (try 2 or 1)
+- --num_epochs : default 30 (try -1 to train forever)
+- --eval_steps : default 50k (try anything lower, decide according to how much time it takes for the eval) 

@@ -39,9 +39,9 @@ class QANet(nn.Module):
         self.c_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
         self.q_emb = layers.InputEmbeddingLayer(word_vectors=word_vectors, drop_prob=0.1)
         self.c_emb_enc = layers.EmbeddingEncoderLayer(
-            conv_layers=4, 
+            conv_layers=3, 
             kernel_size=7,
-            filters=128, 
+            filters=64, 
             heads=heads, 
             enc_blocks=1,
             drop_prob=drop_prob,
@@ -50,9 +50,9 @@ class QANet(nn.Module):
             hidden_size=hidden_size
         )
         self.q_emb_enc = layers.EmbeddingEncoderLayer(
-            conv_layers=4,
+            conv_layers=3,
             kernel_size=7,
-            filters=128,
+            filters=64,
             heads=heads,
             enc_blocks=1,
             drop_prob=drop_prob,
@@ -63,11 +63,11 @@ class QANet(nn.Module):
         self.qc_att = layers.CQAttentionLayer(hidden_size=hidden_size, drop_prob=drop_prob)
         self.qc_conv = layers.ConvBlock(word_embed=hidden_size*4, sent_len=c_len, hidden_size=hidden_size, kernel_size=5)
         self.mod_enc = layers.ModelEncoderLayer(
-            conv_layers=2,
+            conv_layers=3,
             kernel_size=5,
-            filters=128, 
+            filters=64, 
             heads=heads,
-            enc_blocks=7,
+            enc_blocks=4,
             drop_prob=drop_prob,
             sent_len=c_len, 
             word_embed=hidden_size, 

@@ -25,7 +25,7 @@ python3 handle_json.py # to make the splits, skip to use entire train.json
 python3 setup.py --train_url train-v2.0_1.json # to use the first split. To use the second split use 'train-v2.0_2.json'
 
 
-python3 train.py -n baseline_train --num_workers 4 --num_epochs 5 --eval_steps 5000 --batch_size 4 --hidden_size 32 --load_path save/train/saved_model-01 # set the args accordingly
+python3 train.py -n baseline_train --num_workers 4 --num_epochs 5 --eval_steps 5000 --batch_size 16 --hidden_size 64 --load_path save/train/saved_model-01 # set the args accordingly
 ```
 -----------------------------
 ## Setup

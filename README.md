@@ -8,6 +8,7 @@ Check on the following while training:
 - --eval_steps : default 50k (try anything lower, decide according to how much time it takes for the eval) 
 - --hidden_size : default 128
 - --load_path : default None
+- --max_checkpoints : default 5
 
 handle_json.py
 - contains the split code
@@ -17,6 +18,19 @@ handle_json.py
 
 To do on colab:
 ```bash
+from google.colab import drive
+drive.mount('/gdrive')
+
+!git clone https://abhirajtiwari:password@github.com/abhirajtiwari/SQuAD2.git 
+%cd SQuAD2
+!git checkout dev_s
+
+%%bash
+apt install python3-pip
+pip install ujson numpy spacy tensorboard tensorflow tensorboardX tqdm urllib3 torch torchvision
+
+###############################################################
+
 # open handle_json.py and change the splits
 python3 handle_json.py # to make the splits, skip to use entire train.json
 
@@ -25,7 +39,14 @@ python3 handle_json.py # to make the splits, skip to use entire train.json
 python3 setup.py --train_url train-v2.0_1.json # to use the first split. To use the second split use 'train-v2.0_2.json'
 
 
-python3 train.py -n baseline_train --num_workers 4 --num_epochs 5 --eval_steps 5000 --batch_size 16 --hidden_size 64 --load_path save/train/saved_model-01 # set the args accordingly
+python3 train.py -n baseline_train --num_workers 4 --num_epochs 5 --eval_steps 5000 --batch_size 16 --hidden_size 64 --load_path ./save/train/baseline_train-01/step_250024.pth.tar --max_checkpoints 10000 # set the args accordingly
+
+###############################################################
+
+!cp -r save/ /gdrive/My\ Drive/
+
+%load_ext tensorboard
+%tensorboard --logdir save --port 5678
 ```
 -----------------------------
 ## Setup

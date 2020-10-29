@@ -158,9 +158,9 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, vec_size=None, nu
                 array = line.split()
                 word = "".join(array[0:-vec_size])
                 vector = list(map(float, array[-vec_size:]))
-                #if word in counter and counter[word] > limit:
-                embedding_dict[word] = vector
-        print(f"{len(embedding_dict)} / {len(filtered_elements)} WRONG STATEMENT tokens have corresponding {data_type} embedding vector")
+                if word in counter and counter[word] > limit:
+                    embedding_dict[word] = vector
+        print(f"{len(embedding_dict)} / {len(filtered_elements)} tokens have corresponding {data_type} embedding vector")
     else:
         assert vec_size is not None
         for token in filtered_elements:

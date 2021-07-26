@@ -1,7 +1,11 @@
 # SQuAD2.0
 
+- PyTorch implementation of the paper [QANET: Combining Local Convolution with Global Self-Attention for Reading Comprehension](https://arxiv.org/pdf/1804.09541.pdf) by Adams Wei Yu, David Dohan, Minh-Thang Luong, Rui Zhao, Kai Chen, Mohammad Norouzi, Quoc V. Le
 
-Check on the following while training:
+## :bulb: Model Architecture
+<img src="examples/qanet.png" width="742px" height="574px"/>
+
+<!-- Check on the following while training:
 - --batch_size : default 64 (try 4)
 - --num_workers : default 4 (try 2 or 1)
 - --num_epochs : default 30 (try -1 to train forever)
@@ -106,5 +110,5 @@ Sample output:
   "NoAns_exact": 70.4457527333894,
   "NoAns_f1": 70.4457527333894,
   "NoAns_total": 5945
-}
+} -->
 ```

@@ -1,3 +1,8 @@
-train-v2.0.json
-dev-v2.0.json
+data/*
+save/*
 .vscode/settings.json
+__pycache__
+
+!data/dev-v2.0.json
+!data/train-v2.0.json
+!data/test-v2.0.json

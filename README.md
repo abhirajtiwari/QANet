@@ -53,7 +53,8 @@ If you find QANet useful in your research, please consider citing:
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
 ```
-
+If you liked our work, please leave a 🌟 <br>
+Thank you!
 
 
 <!-- Check on the following while training:

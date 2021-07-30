@@ -54,6 +54,8 @@ If you find QANet useful in your research, please consider citing:
 }
 ```
 
+
+
 <!-- Check on the following while training:
 - --batch_size : default 64 (try 4)
 - --num_workers : default 4 (try 2 or 1)

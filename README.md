@@ -1,9 +1,58 @@
-# SQuAD2.0
+# QANet on SQuAD 2.0
 
 - PyTorch implementation of the paper [QANET: Combining Local Convolution with Global Self-Attention for Reading Comprehension](https://arxiv.org/pdf/1804.09541.pdf) by Adams Wei Yu, David Dohan, Minh-Thang Luong, Rui Zhao, Kai Chen, Mohammad Norouzi, Quoc V. Le
 
 ## :bulb: Model Architecture
 <img src="examples/qanet.png" width="742px" height="574px"/>
+
+## :clipboard: Dependencies
+```bash
+git clone https://github.com/abhirajtiwari/SQuAD2.git
+pip3 install -r requirements.txt
+```
+## Setup
+1. This downloads SQuAD 2.0 training and dev sets, as well as the GloVe 300-dimensional word vectors (840B)
+2. This also pre-processes the dataset for efficient data loading
+```bash
+python3 setup.py
+```
+
+## :wrench: Training
+CLI args training `args.py`
+```bash
+python3 train.py -n train_run_1 --num_workers 4 --num_epochs 30 --eval_steps 50000 --batch_size 64 --hidden_size 128
+```
+
+To load the tensorboard
+```bash
+tensorboard --logdir save
+```
+
+## :books: Citing QANet
+If you find QANet useful in your research, please consider citing:
+
+```
+@article{DBLP:journals/corr/abs-1804-09541,
+  author    = {Adams Wei Yu and
+               David Dohan and
+               Minh{-}Thang Luong and
+               Rui Zhao and
+               Kai Chen and
+               Mohammad Norouzi and
+               Quoc V. Le},
+  title     = {QANet: Combining Local Convolution with Global Self-Attention for
+               Reading Comprehension},
+  journal   = {CoRR},
+  volume    = {abs/1804.09541},
+  year      = {2018},
+  url       = {http://arxiv.org/abs/1804.09541},
+  archivePrefix = {arXiv},
+  eprint    = {1804.09541},
+  timestamp = {Mon, 13 Aug 2018 16:48:18 +0200},
+  biburl    = {https://dblp.org/rec/journals/corr/abs-1804-09541.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+```
 
 <!-- Check on the following while training:
 - --batch_size : default 64 (try 4)

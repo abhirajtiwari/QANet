@@ -54,7 +54,6 @@ If you find QANet useful in your research, please consider citing:
 }
 ```
 If you liked our work, please leave a 🌟 <br>
-Thank you!
 
 
 <!-- Check on the following while training:
@@ -162,5 +161,6 @@ Sample output:
   "NoAns_exact": 70.4457527333894,
   "NoAns_f1": 70.4457527333894,
   "NoAns_total": 5945
-} -->
+} 
 ```
+-->

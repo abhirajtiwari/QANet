@@ -3,8 +3,10 @@
 - PyTorch implementation of the paper [QANET: Combining Local Convolution with Global Self-Attention for Reading Comprehension](https://arxiv.org/pdf/1804.09541.pdf) by Adams Wei Yu, David Dohan, Minh-Thang Luong, Rui Zhao, Kai Chen, Mohammad Norouzi, Quoc V. Le
 
 ## :bulb: Model Architecture
-Here are our :books: [Notes](https://github.com/abhirajtiwari/SQuAD2/blob/master/examples/QANET_implementation.pdf) for the implementation
-<img src="examples/qanet.png" width="742px" height="574px"/> <br>
+Here are our :books: [Notes](https://github.com/abhirajtiwari/SQuAD2/blob/master/examples/QANET_implementation.pdf) for the implementation 
+<br>
+<br>
+<img src="examples/qanet.png" width="742px" height="574px"/> 
 
 ## :clipboard: Dependencies
 ```bash
